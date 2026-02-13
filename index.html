@@ -1,0 +1,3761 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pro Cinema Focus Simulator - Ultra Realistic</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Suppress Tailwind CDN warning
+        if (typeof console !== 'undefined') {
+            const originalWarn = console.warn;
+            console.warn = function (...args) {
+                if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+                    return;
+                }
+                originalWarn.apply(console, args);
+            };
+        }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            background: #000;
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #canvas-wrap {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        .viewfinder-hud {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            border: 38px solid rgba(0, 0, 0, 0.85);
+            box-sizing: border-box;
+            z-index: 10;
+            display: none;
+        }
+
+        .digital-text {
+            font-family: 'JetBrains Mono', monospace;
+            text-shadow: 1px 1px 3px #000;
+        }
+
+        .rec-dot {
+            width: 14px;
+            height: 14px;
+            background: #ef4444;
+            border-radius: 50%;
+            display: inline-block;
+            animation: blink 1.2s infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .focus-crosshair {
+            position: absolute;
+            inset: 0;
+            margin: auto;
+            width: 70px;
+            height: 70px;
+            border: 1.5px solid rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        .focus-crosshair::before,
+        .focus-crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.4);
+        }
+
+        .focus-crosshair::before {
+            width: 20px;
+            height: 1.5px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .focus-crosshair::after {
+            width: 1.5px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* AF Area Modes */
+        .af-area-box {
+            position: absolute;
+            inset: 0;
+            margin: auto;
+            border: 2px solid #3b82f6;
+            pointer-events: none;
+            transition: all 0.3s ease;
+            display: none;
+        }
+
+        .af-area-single {
+            width: 60px;
+            height: 60px;
+        }
+
+        .af-area-zone {
+            width: 200px;
+            height: 160px;
+            border-style: dashed;
+        }
+
+        .af-area-wide {
+            width: 80%;
+            height: 70%;
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+
+        .af-lock {
+            border-color: #22c55e !important;
+            box-shadow: 0 0 15px rgba(34, 197, 94, 0.5);
+        }
+
+        .af-hunting {
+            border-color: #ef4444 !important;
+            animation: af-pulse 0.5s infinite;
+        }
+
+        /* AF-C Specific Visual Style - Corner Brackets Animation */
+        .afc-active {
+            border: 2px solid transparent !important;
+            background: linear-gradient(to right, #3b82f6 2px, transparent 2px) 0 0,
+                linear-gradient(to right, #3b82f6 2px, transparent 2px) 0 100%,
+                linear-gradient(to left, #3b82f6 2px, transparent 2px) 100% 0,
+                linear-gradient(to left, #3b82f6 2px, transparent 2px) 100% 100%,
+                linear-gradient(to bottom, #3b82f6 2px, transparent 2px) 0 0,
+                linear-gradient(to bottom, #3b82f6 2px, transparent 2px) 100% 0,
+                linear-gradient(to top, #3b82f6 2px, transparent 2px) 0 100%,
+                linear-gradient(to top, #3b82f6 2px, transparent 2px) 100% 100%;
+            background-repeat: no-repeat;
+            background-size: 8px 8px;
+            animation: afc-corner-pulse 1s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes afc-corner-pulse {
+            0% {
+                background-size: 8px 8px;
+                opacity: 0.6;
+            }
+
+            100% {
+                background-size: 14px 14px;
+                opacity: 1;
+                transform: scale(1.1);
+            }
+        }
+
+        @keyframes af-pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 0.7;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .pulse-glow {
+            animation: button-glow 2s infinite;
+        }
+
+        @keyframes button-glow {
+            0% {
+                box-shadow: 0 0 5px rgba(79, 70, 229, 0.4);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(79, 70, 229, 0.8);
+            }
+
+            100% {
+                box-shadow: 0 0 5px rgba(79, 70, 229, 0.4);
+            }
+        }
+
+        .wheel-ui {
+            width: 160px;
+            height: 160px;
+            border: 6px solid #1e293b;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 50%, #334155, #0f172a);
+            cursor: grab;
+            position: relative;
+            touch-action: none;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            user-select: none;
+        }
+
+        #panel-resizer {
+            width: 6px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 100;
+            transition: background 0.2s;
+        }
+
+        #panel-resizer:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+
+        #panel-resizer::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 2px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 1px;
+        }
+
+        #focus-controls {
+            min-width: 280px;
+            width: 320px;
+            position: relative;
+        }
+
+        .wheel-ui:active {
+            cursor: grabbing;
+        }
+
+        .wheel-mark {
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 28px;
+            background: #ef4444;
+            border-radius: 3px;
+            box-shadow: 0 0 12px #ef4444;
+            transform-origin: 50% 72px;
+        }
+
+        .mode-overlay {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 60;
+            backdrop-filter: blur(8px);
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #475569;
+            border-radius: 3px;
+            width: 100%;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #1e293b;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #1e293b;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .histogram {
+            width: 100%;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .histogram-bar {
+            position: absolute;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to top, #3b82f6, #60a5fa);
+        }
+
+        .zebra-overlay {
+            position: absolute;
+            inset: 38px;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 3px,
+                    rgba(255, 0, 0, 0.3) 3px,
+                    rgba(255, 0, 0, 0.3) 6px);
+            display: none;
+            animation: zebra-scroll 0.5s linear infinite;
+        }
+
+        @keyframes zebra-scroll {
+            from {
+                background-position: 0 0;
+            }
+
+            to {
+                background-position: 0 6px;
+            }
+        }
+
+        .focus-peaking {
+            position: absolute;
+            inset: 38px;
+            pointer-events: none;
+            mix-blend-mode: screen;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .focus-peaking.active {
+            opacity: 1;
+        }
+
+        .grid-overlay {
+            position: absolute;
+            inset: 38px;
+            pointer-events: none;
+            display: none;
+        }
+
+        .grid-overlay.active {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 0;
+        }
+
+        .grid-cell {
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .waveform {
+            width: 120px;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.7);
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .wheel-ui {
+                width: 130px;
+                height: 130px;
+            }
+
+            .wheel-mark {
+                transform-origin: 50% 58px;
+                height: 24px;
+            }
+
+            #focus-controls {
+                padding: 12px;
+            }
+
+            button {
+                padding: 10px 14px !important;
+                font-size: 10px !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="canvas-wrap">
+
+        <!-- Park View Mode Label -->
+        <div id="park-mode-label"
+            class="mode-overlay digital-text text-xs bg-slate-800/90 text-white px-6 py-2.5 rounded-full border border-slate-600 uppercase tracking-widest font-bold shadow-xl backdrop-blur-md">
+            MODE: <span class="text-blue-400">PARK VIEW</span>
+        </div>
+
+        <div class="mode-overlay digital-text text-xs bg-white/80 text-slate-900 px-6 py-2.5 rounded-full border border-black/20 uppercase tracking-widest font-bold shadow-xl backdrop-blur-md hidden"
+            id="cameraman-mode-label">
+            VIEW: <span id="view-label" class="text-blue-700">CAMERAMAN POV</span>
+        </div>
+
+        <!-- Day/Night Toggle & Magnifier -->
+        <div class="absolute top-20 left-1/2 -translate-x-1/2 z-[100] flex gap-3">
+            <button id="btn-day-night"
+                class="bg-slate-800/80 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/20 hover:bg-slate-700 transition-all flex items-center gap-2">
+                <span id="day-night-icon">☀️</span> <span id="day-night-text">Day Mode</span>
+            </button>
+            <button id="btn-magnifier"
+                class="hidden bg-yellow-500/80 text-black px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-black/20 hover:bg-yellow-400 transition-all items-center gap-2"
+                title="Live View Zoom (for MF)">
+                <span>🔍</span> MAGNIFIER: <span id="magnifier-val">OFF</span>
+            </button>
+        </div>
+
+        <!-- Left Side Actor Movement Controls -->
+        <div id="actor-move-left"
+            class="absolute left-6 top-1/2 -translate-y-1/2 z-50 hidden flex flex-col items-center space-y-4 bg-slate-900/40 p-4 rounded-2xl backdrop-blur-md border border-white/20">
+            <span class="text-[10px] font-black tracking-widest text-white/60">ACTOR MOVE</span>
+            <div class="flex flex-col items-center gap-2">
+                <button
+                    class="move-btn bg-white/10 hover:bg-white/20 text-white w-14 h-14 rounded-xl flex items-center justify-center border border-white/20 active:scale-90 transition-all font-black"
+                    id="move-up-left">↑</button>
+                <div class="flex gap-2">
+                    <button
+                        class="move-btn bg-white/10 hover:bg-white/20 text-white w-14 h-14 rounded-xl flex items-center justify-center border border-white/20 active:scale-90 transition-all font-black"
+                        id="move-left-left">←</button>
+                    <button
+                        class="move-btn bg-white/10 hover:bg-white/20 text-white w-14 h-14 rounded-xl flex items-center justify-center border border-white/20 active:scale-90 transition-all font-black"
+                        id="move-down-left">↓</button>
+                    <button
+                        class="move-btn bg-white/10 hover:bg-white/20 text-white w-14 h-14 rounded-xl flex items-center justify-center border border-white/20 active:scale-90 transition-all font-black"
+                        id="move-right-left">→</button>
+                </div>
+            </div>
+            <span class="text-[8px] text-white/40 uppercase">Keyboard: Arrows</span>
+        </div>
+
+        <div id="hud" class="viewfinder-hud">
+            <!-- Top Left: Camera Info & Anatomy Button -->
+            <div class="absolute top-5 left-5 flex flex-col gap-4 z-[110] pointer-events-auto">
+                <div class="flex gap-5 items-center digital-text text-black text-xs font-bold">
+                    <div class="border border-black/60 px-3 py-1 bg-white/30">4K RAW</div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-5 border border-black/50 relative p-0.5">
+                            <div id="battery-level" class="bg-green-600 h-full w-[94%] transition-all"></div>
+                        </div>
+                        <span id="battery-pct">94%</span>
+                    </div>
+                    <div class="border border-black/60 px-3 py-1 bg-white/30">
+                        <span id="fps-counter">24.0 fps</span>
+                    </div>
+                </div>
+
+                <button id="btn-camera-anatomy"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest border-b-4 border-indigo-900 shadow-xl transition-all flex items-center gap-2 w-fit cursor-pointer">
+                    <span>🎥</span> Camera Anatomy
+                </button>
+            </div>
+
+            <!-- Top Right: Recording -->
+            <div class="absolute top-5 right-5 flex items-center gap-2 digital-text font-bold">
+                <span class="rec-dot"></span>
+                <span class="text-red-600 text-base tracking-widest">REC</span>
+            </div>
+
+            <!-- Center: Focus Crosshair -->
+            <div class="focus-crosshair"></div>
+            <div id="af-area-box" class="af-area-box"></div>
+
+            <!-- Bottom Left: Camera Settings -->
+            <div class="absolute bottom-5 left-5 digital-text text-xs space-y-1.5 text-black font-bold">
+                <div>ISO <span id="iso-val">100</span></div>
+                <div>WB: <span id="wb-val">5600</span>K</div>
+                <div><span id="shutter-val">180</span>° SHUTTER</div>
+                <div>LUT: <span id="lut-val">Rec.709</span></div>
+            </div>
+
+            <!-- Bottom Right: Timecode -->
+            <div class="absolute bottom-5 right-5 digital-text text-2xl font-bold tracking-widest text-black">
+                <span id="tc">00:00:00:00</span>
+            </div>
+
+            <!-- Bottom Center: Focus Bar -->
+            <div class="absolute bottom-14 left-1/2 -translate-x-1/2 w-80 flex flex-col items-center">
+                <div class="w-full h-1 bg-black/30 relative rounded">
+                    <div id="focus-ptr"
+                        class="absolute -top-1.5 w-3 h-5 bg-red-600 transition-all duration-150 shadow-lg"
+                        style="left:50%"></div>
+                </div>
+                <div class="mt-3 text-xs digital-text tracking-wider text-black font-bold">
+                    FOCUS: <span id="dist-label">5.0</span>m | DoF: <span id="dof-label">0.8</span>m
+                </div>
+            </div>
+
+            <!-- Top Center: Histogram -->
+            <div class="absolute top-5 left-1/2 -translate-x-1/2">
+                <div class="histogram" id="histogram"></div>
+            </div>
+
+            <!-- Zebra Pattern Overlay -->
+            <div id="zebra-overlay" class="zebra-overlay"></div>
+
+            <!-- 3x3 Grid Overlay -->
+            <div id="grid-overlay" class="grid-overlay">
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+                <div class="grid-cell"></div>
+            </div>
+
+            <!-- Focus Peaking Canvas -->
+            <canvas id="peaking-canvas" class="focus-peaking"></canvas>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="absolute right-6 top-1/2 -translate-y-1/2 space-y-6 z-50">
+            <button id="btn-mode"
+                class="bg-blue-600 text-white font-black py-4 px-10 rounded-xl text-sm shadow-2xl hover:scale-105 active:scale-95 transition-all uppercase tracking-wider border-b-4 border-blue-800">
+                Enter Cameraman Mode
+            </button>
+
+            <button id="btn-settings"
+                class="bg-slate-800 text-white font-black py-4 px-10 rounded-xl text-sm shadow-2xl hover:scale-105 active:scale-95 transition-all uppercase tracking-wider border-b-4 border-black">
+                Camera Settings
+            </button>
+
+            <div id="focus-controls"
+                class="hidden flex flex-col items-center space-y-6 bg-white/70 p-6 rounded-2xl backdrop-blur-xl border border-white/40 shadow-2xl max-h-[85vh] overflow-y-auto interactive-area">
+
+                <!-- Panel Resizer Handle -->
+                <div id="panel-resizer"></div>
+
+                <!-- Follow Focus Wheel -->
+                <div class="flex flex-col items-center">
+                    <span class="text-xs uppercase tracking-widest text-slate-900 mb-3 font-black">FOLLOW FOCUS</span>
+                    <div id="ff-wheel" class="wheel-ui">
+                        <div id="wheel-mark" class="wheel-mark"></div>
+                        <div
+                            class="absolute inset-0 flex items-center justify-center text-xs text-slate-300 font-bold pointer-events-none">
+                            ROTATE
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actor Control -->
+                <div class="w-full space-y-3 pb-4 border-b border-slate-400">
+                    <div
+                        class="text-[10px] text-blue-900 font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                        <span class="w-2 h-2 bg-blue-600 rounded-full"></span> Actor Control
+                    </div>
+                    <div class="text-[10px] text-slate-500 font-bold uppercase mb-2">Select Actor</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <button
+                            class="actor-btn bg-blue-600 text-white text-[10px] font-bold py-2 rounded shadow-sm hover:bg-blue-700 transition"
+                            data-actor="0">Actor 1</button>
+                        <button
+                            class="actor-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded shadow-sm hover:bg-slate-300 transition"
+                            data-actor="1">Actor 2</button>
+                        <button
+                            class="actor-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded shadow-sm hover:bg-slate-300 transition"
+                            data-actor="2">Actor 3</button>
+                        <button
+                            class="actor-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded shadow-sm hover:bg-slate-300 transition"
+                            data-actor="3">Actor 4</button>
+                        <button
+                            class="actor-btn bg-slate-900 text-white text-[10px] font-bold py-2 rounded shadow-sm hover:bg-slate-800 transition hidden"
+                            id="btn-actor-moon" data-actor="4">🌙 Moon</button>
+                    </div>
+
+                    <!-- Restored Focus Action Buttons -->
+                    <div class="pt-2 grid grid-cols-2 gap-2">
+                        <button id="btn-autofocus-main"
+                            class="bg-green-600 hover:bg-green-700 text-white text-[10px] font-black py-3 rounded-lg uppercase tracking-[0.1em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-1">
+                            <span>🎯</span> AUTO FOCUS
+                        </button>
+                        <button id="btn-rack-main"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black py-3 rounded-lg uppercase tracking-[0.1em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-1">
+                            <span>🎬</span> RACK FOCUS
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Focus System -->
+                <div class="w-full space-y-4">
+                    <div class="text-[10px] text-red-900 font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                        <span class="w-2 h-2 bg-red-600 rounded-full"></span> Focus System
+                    </div>
+
+                    <div>
+                        <div class="text-[10px] text-slate-500 font-bold uppercase mb-2">Focus Mode</div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button
+                                class="focus-mode-btn bg-blue-600 text-white text-[10px] font-bold py-2.5 rounded transition"
+                                data-mode="manual">MF</button>
+                            <button
+                                class="focus-mode-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2.5 rounded transition"
+                                data-mode="afs">AF-S</button>
+                            <button
+                                class="focus-mode-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2.5 rounded transition"
+                                data-mode="afc">AF-C</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="text-[10px] text-slate-500 font-bold uppercase mb-2">AF Detection Type <span
+                                class="bg-blue-100 text-blue-600 px-1 py-0.5 rounded text-[8px] ml-2">HYBRID</span>
+                        </div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button
+                                class="af-detect-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded transition"
+                                data-detect="phase">Phase</button>
+                            <button
+                                class="af-detect-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded transition"
+                                data-detect="contrast">Contrast</button>
+                            <button
+                                class="af-detect-btn bg-blue-600 text-white text-[10px] font-bold py-2 rounded transition"
+                                data-detect="hybrid">Hybrid</button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="text-[10px] text-slate-500 font-bold uppercase mb-2">AF Area Mode</div>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button
+                                class="af-area-btn bg-blue-600 text-white text-[10px] font-bold py-2 rounded transition"
+                                data-area="single">Single</button>
+                            <button
+                                class="af-area-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded transition"
+                                data-area="zone">Zone</button>
+                            <button
+                                class="af-area-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded transition"
+                                data-area="wide">Wide</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Focus Memory (A/B) -->
+                <div class="w-full space-y-3 pb-2 border-b border-slate-400">
+                    <div
+                        class="text-[10px] text-indigo-900 font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                        <span class="w-2 h-2 bg-indigo-600 rounded-full"></span> Focus Memory (A/B)
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-2">
+                            <div class="flex gap-1">
+                                <button id="btn-set-a"
+                                    class="flex-1 bg-slate-800 text-white text-[9px] py-1.5 rounded uppercase font-bold hover:bg-slate-700 transition">Set
+                                    A</button>
+                                <button id="btn-reset-a"
+                                    class="bg-red-900/40 text-red-500 text-[8px] px-2 py-1.5 rounded font-black hover:bg-red-800 hover:text-white transition">X</button>
+                            </div>
+                            <button id="btn-goto-a"
+                                class="w-full bg-slate-200 text-slate-800 text-[11px] py-3 rounded-lg font-black uppercase tracking-wider shadow-sm hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                disabled>Point A</button>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex gap-1">
+                                <button id="btn-set-b"
+                                    class="flex-1 bg-slate-800 text-white text-[9px] py-1.5 rounded uppercase font-bold hover:bg-slate-700 transition">Set
+                                    B</button>
+                                <button id="btn-reset-b"
+                                    class="bg-red-900/40 text-red-500 text-[8px] px-2 py-1.5 rounded font-black hover:bg-red-800 hover:text-white transition">X</button>
+                            </div>
+                            <button id="btn-goto-b"
+                                class="w-full bg-slate-200 text-slate-800 text-[11px] py-3 rounded-lg font-black uppercase tracking-wider shadow-sm hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                                disabled>Point B</button>
+                        </div>
+                    </div>
+                    <div class="text-[8px] text-slate-400 text-center italic">Set focus distance then click 'Set' to
+                        save</div>
+
+                    <button id="btn-shoot-rack"
+                        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black py-4 rounded-xl shadow-xl uppercase tracking-[0.2em] active:scale-95 transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled>
+                        <span>🎥</span> SHOOT RACK FOCUS
+                    </button>
+                </div>
+
+                <!-- Visual Aids -->
+                <div class="w-full space-y-2">
+                    <div class="text-xs text-slate-900 font-black uppercase text-center border-b border-slate-400 pb-2">
+                        Visual Aids</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button id="btn-peak"
+                            class="border-2 border-slate-800 text-xs py-2.5 rounded-lg text-slate-900 font-bold hover:bg-slate-800 hover:text-white transition uppercase tracking-widest">
+                            Peaking
+                        </button>
+                        <button id="btn-zebra"
+                            class="border-2 border-slate-800 text-xs py-2.5 rounded-lg text-slate-900 font-bold hover:bg-slate-800 hover:text-white transition uppercase tracking-widest">
+                            Zebras
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Camera Controls -->
+                <div class="pt-4 border-t border-slate-400 w-full space-y-5">
+                    <div class="text-xs text-blue-900 font-black uppercase text-center">Camera Controls</div>
+
+                    <!-- Aperture -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold text-slate-900 uppercase">
+                            <span>IRIS (F-Stop)</span>
+                            <span id="val-fstop" class="text-blue-700">f/4.0</span>
+                        </div>
+                        <input type="range" id="input-fstop" min="1.4" max="22" step="0.1" value="4.0">
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <button id="btn-shallow-dof"
+                                class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-[10px] font-black py-2 rounded border border-indigo-200 transition-all uppercase tracking-tighter">
+                                Shallow Focus (f/1.8)
+                            </button>
+                            <button id="btn-deep-dof"
+                                class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-black py-2 rounded border border-slate-200 transition-all uppercase tracking-tighter">
+                                Deep Focus (f/11)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Focal Length -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold text-slate-900 uppercase">
+                            <span>FOCAL LENGTH</span>
+                            <span id="val-zoom" class="text-blue-700">50mm</span>
+                        </div>
+                        <input type="range" id="input-zoom" min="16" max="200" step="1" value="50">
+                    </div>
+
+                    <!-- ISO -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold text-slate-900 uppercase">
+                            <span>ISO</span>
+                            <span id="val-iso" class="text-blue-700">100</span>
+                        </div>
+                        <input type="range" id="input-iso" min="0" max="256000" step="100" value="100">
+                    </div>
+
+                    <!-- Shutter Speed -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold text-slate-900 uppercase">
+                            <span>SHUTTER ANGLE</span>
+                            <span id="val-shutter" class="text-blue-700">180°</span>
+                        </div>
+                        <input type="range" id="input-shutter" min="45" max="360" step="45" value="180">
+                    </div>
+
+                    <!-- White Balance -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold text-slate-900 uppercase">
+                            <span>WHITE BALANCE</span>
+                            <span id="val-wb" class="text-blue-700">5600K</span>
+                        </div>
+                        <input type="range" id="input-wb" min="2800" max="10000" step="100" value="5600">
+                    </div>
+
+                    <!-- Shutter Speed -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold text-slate-900 uppercase">
+                            <span>SHUTTER SPEED</span>
+                            <span id="val-shutter-speed" class="text-blue-700">1/50</span>
+                        </div>
+                        <input type="range" id="input-shutter-speed" min="24" max="8000" step="1" value="50">
+                    </div>
+
+                    <!-- Aspect Ratio -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold text-slate-900 uppercase">
+                            <span>ASPECT RATIO</span>
+                            <span id="val-aspect" class="text-blue-700">16:9</span>
+                        </div>
+                        <select id="input-aspect"
+                            class="w-full bg-slate-700 text-white px-3 py-2 rounded text-xs font-bold">
+                            <option value="16:9">16:9 (Standard)</option>
+                            <option value="3:1">3:1 (Ultra Wide)</option>
+                            <option value="2.39:1">2.39:1 (Cinemascope)</option>
+                            <option value="1.85:1">1.85:1 (Theatrical)</option>
+                            <option value="4:3">4:3 (Classic)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Record & Photo Controls -->
+                <div class="w-full space-y-3 pt-4 border-t border-slate-400">
+                    <div class="text-xs text-slate-900 font-black uppercase text-center mb-2">Recording Controls</div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="btn-photo"
+                            class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-3.5 rounded-lg uppercase tracking-widest shadow-md transition flex items-center justify-center gap-2">
+                            <span>📷</span> Photo
+                        </button>
+                        <button id="btn-record"
+                            class="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-3.5 rounded-lg uppercase tracking-widest shadow-md transition flex items-center justify-center gap-2">
+                            <span id="record-icon">⏺</span> <span id="record-text">Record</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Singlish Controls -->
+                <div class="w-full space-y-3 pt-4 border-t border-slate-400">
+                    <div class="text-xs text-slate-900 font-black uppercase text-center mb-2">Singlish Controls Lah
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="btn-snap-lah"
+                            class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-3.5 rounded-lg shadow-md transition flex items-center justify-center gap-2">
+                            <span>📸</span> SNAP LAH
+                        </button>
+                        <button id="btn-record-liao"
+                            class="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-3.5 rounded-lg shadow-md transition flex items-center justify-center gap-2">
+                            <span id="record-liao-icon">●</span> <span id="record-liao-text">REC LIAO</span>
+                        </button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="btn-shutter-ah"
+                            class="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold py-3.5 rounded-lg shadow-md transition flex items-center justify-center gap-2">
+                            <span>⚡</span> SHUTTER AH
+                        </button>
+                        <button id="btn-grid-lor"
+                            class="bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold py-3.5 rounded-lg shadow-md transition flex items-center justify-center gap-2">
+                            <span>⊞</span> <span id="grid-lor-text">GRID LOR</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Presets -->
+                <div class="w-full space-y-2 pt-4 border-t border-slate-400">
+                    <div class="text-xs text-slate-900 font-black uppercase text-center mb-2">Quick Presets</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button
+                            class="preset-btn border border-slate-600 text-xs py-2 rounded text-slate-900 hover:bg-slate-700 hover:text-white transition"
+                            data-preset="portrait">Portrait</button>
+                        <button
+                            class="preset-btn border border-slate-600 text-xs py-2 rounded text-slate-900 hover:bg-slate-700 hover:text-white transition"
+                            data-preset="landscape">Landscape</button>
+                        <button
+                            class="preset-btn border border-slate-600 text-xs py-2 rounded text-slate-900 hover:bg-slate-700 hover:text-white transition"
+                            data-preset="cinematic">Cinematic</button>
+                        <button
+                            class="preset-btn border border-slate-600 text-xs py-2 rounded text-slate-900 hover:bg-slate-700 hover:text-white transition"
+                            data-preset="sports">Sports</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Settings Modal -->
+        <div id="settings-modal"
+            class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+            <div
+                class="bg-gradient-to-br from-slate-900 to-black border-2 border-yellow-500 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 p-4 rounded-t-xl">
+                    <h2 class="text-black font-black text-lg uppercase tracking-widest text-center">
+                        ARRI ALEXA 35 - Advanced Settings
+                    </h2>
+                </div>
+
+                <div class="p-6 space-y-6">
+
+                    <!-- Sensor Format -->
+                    <div>
+                        <label class="block text-yellow-500 text-xs font-black uppercase mb-3 tracking-wider">Sensor
+                            Format</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button
+                                class="sensor-format-btn bg-yellow-500 text-black py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-yellow-400 transition"
+                                data-format="full">Full Frame</button>
+                            <button
+                                class="sensor-format-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-slate-600 transition"
+                                data-format="super35">Super 35</button>
+                        </div>
+                    </div>
+
+                    <!-- Exposure Index -->
+                    <div>
+                        <label class="block text-yellow-500 text-xs font-black uppercase mb-3 tracking-wider">Exposure
+                            Index</label>
+                        <div class="grid grid-cols-3 gap-3">
+                            <button
+                                class="ei-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold text-sm hover:bg-slate-600 transition"
+                                data-ei="200">200</button>
+                            <button
+                                class="ei-btn bg-yellow-500 text-black py-3 px-4 rounded-lg font-bold text-sm hover:bg-yellow-400 transition"
+                                data-ei="800">800</button>
+                            <button
+                                class="ei-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold text-sm hover:bg-slate-600 transition"
+                                data-ei="1600">1600</button>
+                        </div>
+                    </div>
+
+                    <!-- White Balance -->
+                    <div>
+                        <label class="block text-yellow-500 text-xs font-black uppercase mb-3 tracking-wider">White
+                            Balance</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button
+                                class="wb-btn bg-yellow-500 text-black py-3 px-4 rounded-lg font-bold text-sm hover:bg-yellow-400 transition"
+                                data-wb="5600">5600 K</button>
+                            <button
+                                class="wb-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold text-sm hover:bg-slate-600 transition"
+                                data-wb="3200">3200 K</button>
+                        </div>
+                    </div>
+
+                    <!-- Shutter Angle -->
+                    <div>
+                        <label class="block text-yellow-500 text-xs font-black uppercase mb-3 tracking-wider">Shutter
+                            Angle</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button
+                                class="shutter-btn bg-yellow-500 text-black py-3 px-4 rounded-lg font-bold text-sm hover:bg-yellow-400 transition"
+                                data-shutter="180">180°</button>
+                            <button
+                                class="shutter-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold text-sm hover:bg-slate-600 transition"
+                                data-shutter="90">90°</button>
+                        </div>
+                    </div>
+
+                    <!-- Visual Aids Row 1 -->
+                    <div>
+                        <label class="block text-yellow-500 text-xs font-black uppercase mb-3 tracking-wider">Visual
+                            Aids</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button id="modal-false-color"
+                                class="visual-aid-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-slate-600 transition">False
+                                Color</button>
+                            <button id="modal-zebra"
+                                class="visual-aid-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-slate-600 transition">Zebras</button>
+                        </div>
+                    </div>
+
+                    <!-- Visual Aids Row 2 -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="modal-lut-preview"
+                            class="visual-aid-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-slate-600 transition">LUT
+                            Preview</button>
+                        <button id="modal-desqueeze"
+                            class="visual-aid-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-slate-600 transition">Anamorphic
+                            Desqueeze</button>
+                    </div>
+
+                    <!-- Visual Aids Row 3 -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="modal-histogram"
+                            class="visual-aid-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-slate-600 transition">Histogram</button>
+                        <button id="modal-waveform"
+                            class="visual-aid-btn bg-slate-700 text-white py-3 px-4 rounded-lg font-bold uppercase text-sm hover:bg-slate-600 transition">Waveform</button>
+                    </div>
+
+                    <!-- Close Button -->
+                    <button id="close-settings"
+                        class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-lg uppercase tracking-widest text-sm transition mt-4">
+                        Close Settings
+                    </button>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════
+        // CORE SETUP
+        // ═══════════════════════════════════════════════════════════════
+        let scene, camera, renderer, clock;
+        let cameramanGroup, subjects = [], trees = [], rocks = [];
+        let viewMode = '3rdPerson';
+        let orbitControls;
+        let composer, renderPass;
+
+        const state = {
+            focusDist: 25.0,
+            aperture: 4.0,
+            zoom: 50,
+            iso: 100,
+            shutterAngle: 180,
+            shutterSpeed: 50,
+            whiteBalance: 5600,
+            isPeaking: false,
+            isZebra: false,
+            wheelAngle: 0,
+            orbit: { phi: Math.PI / 2 - 0.4, theta: -Math.PI / 1.4, radius: 20 },
+            look: { x: 0, y: Math.PI },
+            timecode: { h: 0, m: 0, s: 0, f: 0 },
+            sensorFormat: 'full',
+            exposureIndex: 800,
+            falseColor: false,
+            lutPreview: false,
+            anamorphicDesqueeze: false,
+            showHistogram: true,
+            showWaveform: false,
+            isRecording: false,
+            afMode: 'manual',
+            afDetection: 'hybrid', // 'phase', 'contrast', 'hybrid'
+            afArea: 'single', // 'single', 'zone', 'wide'
+            selectedActorIndex: 0,
+            aspectRatio: '16:9',
+            focusA: null,
+            focusB: null,
+            isNight: false,
+            isMagnified: false
+        };
+
+        const elements = {
+            hud: document.getElementById('hud'),
+            viewLabel: document.getElementById('view-label'),
+            btnMode: document.getElementById('btn-mode'),
+            focusControls: document.getElementById('focus-controls'),
+            wheel: document.getElementById('ff-wheel'),
+            wheelMark: document.getElementById('wheel-mark'),
+            distLabel: document.getElementById('dist-label'),
+            dofLabel: document.getElementById('dof-label'),
+            afAreaBox: document.getElementById('af-area-box'),
+            focusPtr: document.getElementById('focus-ptr'),
+            actorBtns: document.querySelectorAll('.actor-btn'),
+            btnAutofocusMain: document.getElementById('btn-autofocus-main'),
+            btnRack: document.getElementById('btn-rack-main'),
+            moveBtns: {
+                up: document.getElementById('move-up-left'),
+                down: document.getElementById('move-down-left'),
+                left: document.getElementById('move-left-left'),
+                right: document.getElementById('move-right-left')
+            },
+            actorMoveLeftPanel: document.getElementById('actor-move-left'),
+            focusModeBtns: document.querySelectorAll('.focus-mode-btn'),
+            afDetectBtns: document.querySelectorAll('.af-detect-btn'),
+            afAreaBtns: document.querySelectorAll('.af-area-btn'),
+            btnSetA: document.getElementById('btn-set-a'),
+            btnResetA: document.getElementById('btn-reset-a'),
+            btnGotoA: document.getElementById('btn-goto-a'),
+            btnSetB: document.getElementById('btn-set-b'),
+            btnResetB: document.getElementById('btn-reset-b'),
+            btnGotoB: document.getElementById('btn-goto-b'),
+            btnShootRack: document.getElementById('btn-shoot-rack'),
+            btnPeak: document.getElementById('btn-peak'),
+            btnZebra: document.getElementById('btn-zebra'),
+            zebraOverlay: document.getElementById('zebra-overlay'),
+            peakingCanvas: document.getElementById('peaking-canvas'),
+            fstopVal: document.getElementById('val-fstop'),
+            zoomVal: document.getElementById('val-zoom'),
+            isoVal: document.getElementById('val-iso'),
+            shutterVal: document.getElementById('val-shutter'),
+            shutterSpeedVal: document.getElementById('val-shutter-speed'),
+            wbVal: document.getElementById('val-wb'),
+            aspectVal: document.getElementById('val-aspect'),
+            inputFstop: document.getElementById('input-fstop'),
+            inputZoom: document.getElementById('input-zoom'),
+            inputIso: document.getElementById('input-iso'),
+            inputShutter: document.getElementById('input-shutter'),
+            inputShutterSpeed: document.getElementById('input-shutter-speed'),
+            inputWb: document.getElementById('input-wb'),
+            inputAspect: document.getElementById('input-aspect'),
+            btnPhoto: document.getElementById('btn-photo'),
+            btnRecord: document.getElementById('btn-record'),
+            btnShallow: document.getElementById('btn-shallow-dof'),
+            btnDeep: document.getElementById('btn-deep-dof'),
+            recordIcon: document.getElementById('record-icon'),
+            recordText: document.getElementById('record-text'),
+            tc: document.getElementById('tc'),
+            histogram: document.getElementById('histogram'),
+            fpsCounter: document.getElementById('fps-counter'),
+            batteryLevel: document.getElementById('battery-level'),
+            batteryPct: document.getElementById('battery-pct'),
+            btnDayNight: document.getElementById('btn-day-night'),
+            btnMagnifier: document.getElementById('btn-magnifier'),
+            dayNightIcon: document.getElementById('day-night-icon'),
+            dayNightText: document.getElementById('day-night-text'),
+            magnifierVal: document.getElementById('magnifier-val')
+        };
+
+        // ═══════════════════════════════════════════════════════════════
+        // INITIALIZATION
+        // ═══════════════════════════════════════════════════════════════
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb);
+            scene.fog = new THREE.FogExp2(0x87ceeb, 0.0003);
+
+            clock = new THREE.Clock();
+
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            updateCamera();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            document.getElementById('canvas-wrap').prepend(renderer.domElement);
+
+            // Lighting
+            const sun = new THREE.DirectionalLight(0xfff5e6, 1.5);
+            sun.position.set(-60, 100, -40);
+            sun.castShadow = true;
+            sun.name = "sun";
+            scene.add(sun);
+
+            const ambient = new THREE.AmbientLight(0xb8d4ff, 0.6);
+            ambient.name = "ambient";
+            scene.add(ambient);
+
+            const hemi = new THREE.HemisphereLight(0x87ceeb, 0x3a6a3a, 0.4);
+            hemi.name = "hemi";
+            scene.add(hemi);
+
+            // Moon for night mode
+            const moonGeo = new THREE.SphereGeometry(35, 64, 64);
+            const moonMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                emissive: 0xffffff,
+                emissiveIntensity: 3.0, // Brighter moon
+                roughness: 1,
+                metalness: 0
+            });
+            const moon = new THREE.Mesh(moonGeo, moonMat);
+            moon.position.set(-150, 300, -500); // Moved to be more visible
+            moon.name = "moon";
+            moon.visible = false;
+            scene.add(moon);
+
+            // Add Moon to subjects for focus selection
+            subjects.push({
+                id: 'moon',
+                mesh: moon,
+                pos: moon.position.clone()
+            });
+
+            // Ground with texture-like appearance
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(2000, 2000, 50, 50),
+                new THREE.MeshStandardMaterial({
+                    color: 0x4a7c4a,
+                    roughness: 0.95,
+                    metalness: 0.0
+                })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Add ground variation
+            const positions = ground.geometry.attributes.position;
+            for (let i = 0; i < positions.count; i++) {
+                positions.setZ(i, Math.random() * 0.3);
+            }
+            positions.needsUpdate = true;
+            ground.geometry.computeVertexNormals();
+
+            createEnvironment();
+            cameramanGroup = createCinemaRig(0, 0);
+            createHumanoid(0, -10, 0xff6b6b, 'actor-front'); // 10 feet in front of camera
+            createHumanoid(0, 25, 0xffffff, 'actor1'); // 25 feet away
+            createHumanoid(-8, 32, 0x224466, 'actor2'); // 32 feet away
+            createHumanoid(10, 35, 0xaa3344, 'actor3'); // 35 feet away
+
+            setupControls();
+            setupHistogram();
+            animate();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // SCENE BUILDING
+        // ═══════════════════════════════════════════════════════════════
+        function createEnvironment() {
+            // Trees
+            for (let i = 0; i < 180; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = 25 + Math.random() * 140;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+
+                const group = new THREE.Group();
+
+                const trunkHeight = 8 + Math.random() * 5;
+                const trunk = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.3 + Math.random() * 0.2, 0.5 + Math.random() * 0.2, trunkHeight, 8),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x4a3728,
+                        roughness: 0.9
+                    })
+                );
+                trunk.castShadow = true;
+                trunk.receiveShadow = true;
+                trunk.position.y = trunkHeight / 2;
+
+                const crownSize = 3.5 + Math.random() * 2.5;
+                const crown = new THREE.Mesh(
+                    new THREE.SphereGeometry(crownSize, 10, 10),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x2d5a2d,
+                        roughness: 1.0
+                    })
+                );
+                crown.castShadow = true;
+                crown.position.y = trunkHeight + crownSize * 0.6;
+
+                group.add(trunk, crown);
+                group.position.set(x, 0, z);
+                scene.add(group);
+                trees.push(group);
+            }
+
+            // Buildings behind trees
+            createBuildings();
+
+            // Rocks
+            for (let i = 0; i < 40; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = 5 + Math.random() * 60;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+
+                const rock = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.5 + Math.random() * 1.2, 6, 6),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x666666,
+                        roughness: 0.95,
+                        metalness: 0.1
+                    })
+                );
+                rock.position.set(x, (0.5 + Math.random() * 1.2) * 0.4, z);
+                rock.rotation.set(Math.random(), Math.random(), Math.random());
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                rock.scale.set(1, 0.6 + Math.random() * 0.4, 1);
+                scene.add(rock);
+                rocks.push(rock);
+            }
+
+            // Grass patches
+            for (let i = 0; i < 60; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = Math.random() * 40;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+
+                const grassPatch = new THREE.Mesh(
+                    new THREE.CircleGeometry(1 + Math.random() * 2, 8),
+                    new THREE.MeshStandardMaterial({
+                        color: 0x3d7a3d,
+                        roughness: 1.0,
+                        side: THREE.DoubleSide
+                    })
+                );
+                grassPatch.rotation.x = -Math.PI / 2;
+                grassPatch.position.set(x, 0.02, z);
+                grassPatch.receiveShadow = true;
+                scene.add(grassPatch);
+            }
+        }
+
+        function createBuildings() {
+            const buildingConfigs = [
+                // North side - Office district
+                { x: -120, z: -180, width: 30, height: 45, depth: 25, color: 0x8b9dc3 },
+                { x: -85, z: -190, width: 25, height: 60, depth: 20, color: 0xa8b5c7 },
+                { x: -45, z: -175, width: 35, height: 40, depth: 30, color: 0x7a8a9f },
+                { x: -10, z: -185, width: 28, height: 52, depth: 24, color: 0x929faf },
+                { x: 25, z: -195, width: 32, height: 48, depth: 26, color: 0x8693a8 },
+                { x: 50, z: -185, width: 28, height: 55, depth: 22, color: 0x95a3b8 },
+                { x: 90, z: -170, width: 32, height: 50, depth: 28, color: 0x8895aa },
+                { x: 130, z: -195, width: 26, height: 65, depth: 24, color: 0xa1aec2 },
+                { x: 165, z: -180, width: 30, height: 42, depth: 25, color: 0x7d8fa4 },
+
+                // South side - Residential area
+                { x: -160, z: 160, width: 20, height: 30, depth: 18, color: 0xc4a57b },
+                { x: -130, z: 175, width: 22, height: 35, depth: 20, color: 0xb89968 },
+                { x: -95, z: 165, width: 18, height: 28, depth: 16, color: 0xd4b896 },
+                { x: -65, z: 180, width: 24, height: 32, depth: 19, color: 0xc9a87d },
+                { x: -30, z: 170, width: 20, height: 30, depth: 18, color: 0xb89d72 },
+                { x: 5, z: 185, width: 22, height: 34, depth: 20, color: 0xd1b388 },
+                { x: 40, z: 175, width: 21, height: 31, depth: 17, color: 0xc2a479 },
+                { x: 70, z: 190, width: 23, height: 36, depth: 21, color: 0xbca074 },
+                { x: 100, z: 170, width: 24, height: 32, depth: 19, color: 0xc9ad7f },
+                { x: 140, z: 180, width: 21, height: 38, depth: 17, color: 0xb5a076 },
+                { x: 170, z: 165, width: 26, height: 33, depth: 22, color: 0xddc29a },
+
+                // East side - Mixed use
+                { x: 175, z: -140, width: 28, height: 46, depth: 24, color: 0x8f9cb1 },
+                { x: 185, z: -100, width: 30, height: 50, depth: 26, color: 0x97a4b9 },
+                { x: 190, z: -60, width: 26, height: 44, depth: 22, color: 0x8a97ac },
+                { x: 195, z: -20, width: 32, height: 52, depth: 28, color: 0x9ba8bd },
+                { x: 200, z: 20, width: 28, height: 50, depth: 24, color: 0x8799ae },
+                { x: 190, z: 60, width: 30, height: 48, depth: 26, color: 0x93a0b5 },
+                { x: 185, z: 100, width: 26, height: 45, depth: 22, color: 0x8e9bb0 },
+                { x: 180, z: 135, width: 28, height: 42, depth: 24, color: 0x9aa7bc },
+
+                // West side - Commercial
+                { x: -180, z: -135, width: 26, height: 44, depth: 22, color: 0x91a3b8 },
+                { x: -190, z: -95, width: 28, height: 48, depth: 24, color: 0x8c9eb3 },
+                { x: -195, z: -55, width: 24, height: 42, depth: 20, color: 0x97a9be },
+                { x: -200, z: -15, width: 30, height: 50, depth: 26, color: 0x8a9cb1 },
+                { x: -200, z: 25, width: 28, height: 46, depth: 24, color: 0x9aa8bd },
+                { x: -195, z: 65, width: 26, height: 44, depth: 22, color: 0x8d9fb4 },
+                { x: -185, z: 105, width: 30, height: 48, depth: 26, color: 0x92a4b9 },
+                { x: -175, z: 140, width: 24, height: 40, depth: 20, color: 0x95a7bc },
+
+                // Central tall buildings
+                { x: 0, z: -200, width: 40, height: 70, depth: 35, color: 0x7f8fa4 },
+                { x: -200, z: 0, width: 30, height: 45, depth: 25, color: 0x9aa8bd },
+                { x: 200, z: 0, width: 28, height: 50, depth: 24, color: 0x8799ae },
+
+                // Fill corner gaps
+                { x: -150, z: -150, width: 25, height: 38, depth: 22, color: 0x96a3b8 },
+                { x: 150, z: -150, width: 27, height: 40, depth: 24, color: 0x8f9cb1 },
+                { x: -150, z: 150, width: 23, height: 36, depth: 20, color: 0xc7ab81 },
+                { x: 150, z: 150, width: 25, height: 34, depth: 22, color: 0xc3a77d },
+            ];
+
+            buildingConfigs.forEach(config => {
+                const building = new THREE.Group();
+
+                // Main building body
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(config.width, config.height, config.depth),
+                    new THREE.MeshStandardMaterial({
+                        color: config.color,
+                        roughness: 0.7,
+                        metalness: 0.2
+                    })
+                );
+                body.position.y = config.height / 2;
+                body.castShadow = true;
+                body.receiveShadow = true;
+                building.add(body);
+
+                // Windows
+                const windowRows = Math.floor(config.height / 4);
+                const windowCols = Math.floor(config.width / 3);
+
+                for (let row = 0; row < windowRows; row++) {
+                    for (let col = 0; col < windowCols; col++) {
+                        // Front windows
+                        const windowFront = new THREE.Mesh(
+                            new THREE.PlaneGeometry(1.5, 2),
+                            new THREE.MeshStandardMaterial({
+                                color: Math.random() > 0.3 ? 0xfff9e6 : 0x2a2a2a,
+                                emissive: Math.random() > 0.3 ? 0xffddaa : 0x000000,
+                                emissiveIntensity: 0.3
+                            })
+                        );
+                        windowFront.position.set(
+                            -config.width / 2 + 3 + col * 3,
+                            4 + row * 4,
+                            config.depth / 2 + 0.01
+                        );
+                        building.add(windowFront);
+
+                        // Back windows
+                        const windowBack = new THREE.Mesh(
+                            new THREE.PlaneGeometry(1.5, 2),
+                            new THREE.MeshStandardMaterial({
+                                color: Math.random() > 0.3 ? 0xfff9e6 : 0x2a2a2a,
+                                emissive: Math.random() > 0.3 ? 0xffddaa : 0x000000,
+                                emissiveIntensity: 0.3
+                            })
+                        );
+                        windowBack.position.set(
+                            -config.width / 2 + 3 + col * 3,
+                            4 + row * 4,
+                            -config.depth / 2 - 0.01
+                        );
+                        windowBack.rotation.y = Math.PI;
+                        building.add(windowBack);
+                    }
+                }
+
+                // Rooftop elements
+                if (Math.random() > 0.5) {
+                    const rooftop = new THREE.Mesh(
+                        new THREE.BoxGeometry(config.width * 0.3, 3, config.depth * 0.3),
+                        new THREE.MeshStandardMaterial({
+                            color: 0x555555,
+                            roughness: 0.8
+                        })
+                    );
+                    rooftop.position.y = config.height + 1.5;
+                    building.add(rooftop);
+                }
+
+                building.position.set(config.x, 0, config.z);
+                scene.add(building);
+            });
+
+            // Add many more smaller shops/stores around the park perimeter
+            for (let i = 0; i < 24; i++) {
+                const angle = (i / 24) * Math.PI * 2;
+                const r = 80 + Math.random() * 15;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+
+                const shop = new THREE.Mesh(
+                    new THREE.BoxGeometry(8, 6, 6),
+                    new THREE.MeshStandardMaterial({
+                        color: [0xe8d4b8, 0xc4a57b, 0xd4b896, 0xddc29a][Math.floor(Math.random() * 4)],
+                        roughness: 0.8
+                    })
+                );
+                shop.position.set(x, 3, z);
+                shop.lookAt(0, 3, 0);
+                shop.castShadow = true;
+                shop.receiveShadow = true;
+                scene.add(shop);
+
+                // Awning
+                const awning = new THREE.Mesh(
+                    new THREE.BoxGeometry(9, 0.2, 2.5),
+                    new THREE.MeshStandardMaterial({
+                        color: [0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3][Math.floor(Math.random() * 4)]
+                    })
+                );
+                awning.position.set(x, 4.5, z);
+                awning.lookAt(0, 4.5, 0);
+                const awningForward = new THREE.Vector3(0, 0, 1);
+                awningForward.applyQuaternion(awning.quaternion);
+                awning.position.add(awningForward.multiplyScalar(3.5));
+                scene.add(awning);
+            }
+
+            // Add medium buildings to fill remaining gaps
+            const mediumBuildings = [
+                { x: -110, z: -110, width: 18, height: 35, depth: 16 },
+                { x: -110, z: 110, width: 18, height: 32, depth: 16 },
+                { x: 110, z: -110, width: 18, height: 36, depth: 16 },
+                { x: 110, z: 110, width: 18, height: 33, depth: 16 },
+                { x: -70, z: -70, width: 15, height: 28, depth: 14 },
+                { x: -70, z: 70, width: 15, height: 30, depth: 14 },
+                { x: 70, z: -70, width: 15, height: 29, depth: 14 },
+                { x: 70, z: 70, width: 15, height: 31, depth: 14 },
+            ];
+
+            mediumBuildings.forEach(config => {
+                const building = new THREE.Mesh(
+                    new THREE.BoxGeometry(config.width, config.height, config.depth),
+                    new THREE.MeshStandardMaterial({
+                        color: Math.random() > 0.5 ? 0x95a3b8 : 0xc4a57b,
+                        roughness: 0.75
+                    })
+                );
+                building.position.set(config.x, config.height / 2, config.z);
+                building.castShadow = true;
+                scene.add(building);
+            });
+        }
+
+        function createHumanoid(x, z, color, id) {
+            const g = new THREE.Group();
+            const skin = new THREE.MeshStandardMaterial({ color: 0xffd9b3, roughness: 0.8 });
+            const cloth = new THREE.MeshStandardMaterial({ color, roughness: 0.7 });
+
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.9, 0.35), cloth);
+            torso.position.y = 1.45;
+            torso.castShadow = true;
+            g.add(torso);
+
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), skin);
+            head.position.y = 2.0;
+            head.castShadow = true;
+            g.add(head);
+
+            const leg = new THREE.BoxGeometry(0.22, 1.1, 0.22);
+            const lLeg = new THREE.Mesh(leg, cloth);
+            lLeg.position.set(-0.15, 0.55, 0);
+            lLeg.castShadow = true;
+            const rLeg = new THREE.Mesh(leg, cloth);
+            rLeg.position.set(0.15, 0.55, 0);
+            rLeg.castShadow = true;
+            g.add(lLeg, rLeg);
+
+            const arm = new THREE.BoxGeometry(0.18, 0.85, 0.18);
+            const lArm = new THREE.Mesh(arm, skin);
+            lArm.position.set(-0.42, 1.45, 0);
+            lArm.castShadow = true;
+            const rArm = new THREE.Mesh(arm, skin);
+            rArm.position.set(0.42, 1.45, 0);
+            rArm.castShadow = true;
+            g.add(lArm, rArm);
+
+            g.position.set(x, 0, z);
+            g.lookAt(0, 1.5, 0);
+            g.castShadow = true;
+            scene.add(g);
+
+            subjects.push({
+                mesh: g,
+                pos: new THREE.Vector3(x, 1.6, z),
+                id: id,
+                leftArm: lArm,
+                rightArm: rArm
+            });
+        }
+
+        function createCinemaRig(x, z) {
+            const rig = new THREE.Group();
+            const black = new THREE.MeshStandardMaterial({
+                color: 0x0a0a0a,
+                roughness: 0.4,
+                metalness: 0.6
+            });
+            const metal = new THREE.MeshStandardMaterial({
+                color: 0x2a2a2a,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+
+            // 1. TRIPOD HUB (The heavy central part where legs join)
+            const hub = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2, 0.2, 0.15, 16),
+                metal
+            );
+            hub.position.y = 1.4;
+            rig.add(hub);
+
+            // 2. TRIPOD LEGS (Properly jointed to hub)
+            for (let i = 0; i < 3; i++) {
+                const legPivot = new THREE.Group();
+                legPivot.position.y = 1.4; // Pivots at hub height
+                legPivot.rotation.y = (i * Math.PI * 2) / 3;
+                rig.add(legPivot);
+
+                // Upper leg section
+                const leg = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.04, 1.4, 8),
+                    black
+                );
+                leg.position.y = -0.7; // Half of 1.4
+                leg.rotation.z = 0.4;  // Tilt outwards
+                leg.castShadow = true;
+                legPivot.add(leg);
+            }
+
+            // 3. FLUID HEAD (Connecting hub to camera)
+            const fluidHeadBase = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.12, 0.12, 0.2, 12),
+                black
+            );
+            fluidHeadBase.position.y = 1.55;
+            rig.add(fluidHeadBase);
+
+            const fluidHeadBody = new THREE.Mesh(
+                new THREE.BoxGeometry(0.35, 0.3, 0.35),
+                black
+            );
+            fluidHeadBody.position.y = 1.75;
+            fluidHeadBody.castShadow = true;
+            rig.add(fluidHeadBody);
+
+            // 4. CAMERA SYSTEM
+            const camBase = new THREE.Mesh(
+                new THREE.BoxGeometry(0.4, 0.06, 0.6),
+                metal
+            );
+            camBase.position.y = 1.93;
+            rig.add(camBase);
+
+            const camBody = new THREE.Mesh(
+                new THREE.BoxGeometry(0.42, 0.42, 0.65),
+                black
+            );
+            camBody.position.y = 2.17;
+            camBody.castShadow = true;
+            rig.add(camBody);
+
+            const lens = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.14, 0.14, 0.45, 20),
+                black
+            );
+            lens.rotation.x = Math.PI / 2;
+            lens.position.set(0, 2.17, 0.4);
+            lens.castShadow = true;
+            rig.add(lens);
+
+            const matte = new THREE.Mesh(
+                new THREE.BoxGeometry(0.52, 0.42, 0.12),
+                metal
+            );
+            matte.position.set(0, 2.17, 0.65);
+            matte.castShadow = true;
+            rig.add(matte);
+
+            const monitor = new THREE.Mesh(
+                new THREE.BoxGeometry(0.38, 0.24, 0.04),
+                new THREE.MeshStandardMaterial({ color: 0x050505 })
+            );
+            monitor.position.set(0.35, 2.4, 0);
+            monitor.rotation.y = -0.4;
+            rig.add(monitor);
+
+            rig.position.set(x, 0, z);
+            scene.add(rig);
+            return rig;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // CAMERA & CONTROLS
+        // ═══════════════════════════════════════════════════════════════
+        function updateCamera() {
+            if (viewMode === '3rdPerson') {
+                const { phi, theta, radius } = state.orbit;
+                camera.position.x = radius * Math.sin(phi) * Math.sin(theta);
+                camera.position.y = radius * Math.cos(phi) + 1.8;
+                camera.position.z = radius * Math.sin(phi) * Math.cos(theta);
+                camera.lookAt(0, 1.6, 0);
+                camera.fov = 50;
+            } else {
+                camera.position.set(0, 2.17, 0.15);
+                camera.rotation.set(state.look.x, state.look.y, 0, 'YXZ');
+                camera.fov = 90 - (state.zoom - 16) * 0.4;
+
+                // Digital Magnification (Live View Zoom)
+                camera.zoom = state.isMagnified ? 2.5 : 1.0;
+            }
+            camera.updateProjectionMatrix();
+        }
+
+        function setupControls() {
+            let isDragging = false;
+            let lastX, lastY;
+
+            const onDown = (e) => {
+                if (e.target.closest('.interactive-area, #focus-controls')) return;
+                isDragging = true;
+                lastX = e.clientX ?? e.touches?.[0].clientX;
+                lastY = e.clientY ?? e.touches?.[0].clientY;
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.clientX ?? e.touches?.[0].clientX;
+                const y = e.clientY ?? e.touches?.[0].clientY;
+                const dx = x - lastX;
+                const dy = y - lastY;
+
+                if (viewMode === '3rdPerson') {
+                    state.orbit.theta -= dx * 0.005;
+                    state.orbit.phi = Math.max(0.1, Math.min(Math.PI / 2 - 0.05, state.orbit.phi - dy * 0.005));
+                } else {
+                    state.look.y -= dx * 0.003;
+                    state.look.x = Math.max(-1.4, Math.min(1.4, state.look.x - dy * 0.003));
+                }
+
+                lastX = x;
+                lastY = y;
+                updateCamera();
+            };
+
+            const onUp = () => isDragging = false;
+
+            renderer.domElement.addEventListener('mousedown', onDown);
+            renderer.domElement.addEventListener('touchstart', onDown, { passive: false });
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove, { passive: false });
+            window.addEventListener('mouseup', onUp);
+            window.addEventListener('touchend', onUp);
+
+            // Zoom control
+            window.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                if (viewMode === '1stPerson') {
+                    state.zoom = Math.max(16, Math.min(200, state.zoom - Math.sign(e.deltaY) * 2));
+                    elements.inputZoom.value = state.zoom;
+                    elements.zoomVal.textContent = `${Math.round(state.zoom)}mm`;
+                    updateCamera();
+                } else {
+                    state.orbit.radius = Math.max(5, Math.min(100, state.orbit.radius + e.deltaY * 0.04));
+                    updateCamera();
+                }
+            }, { passive: false });
+
+            setupFollowFocusWheel();
+            setupModeSwitch();
+            setupCameraControls();
+            setupPresets();
+            setupAdvancedSettings();
+            setupActorAndFocusSystem();
+            setupEnvironmentControls();
+
+            // Actor Movement Keyboard Listener
+            window.addEventListener('keydown', (e) => {
+                const moveSpeed = 0.5;
+                if (e.key === 'ArrowUp') moveActor(0, -moveSpeed);
+                if (e.key === 'ArrowDown') moveActor(0, moveSpeed);
+                if (e.key === 'ArrowLeft') moveActor(-moveSpeed, 0);
+                if (e.key === 'ArrowRight') moveActor(moveSpeed, 0);
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    state.selectedActorIndex = (state.selectedActorIndex + 1) % subjects.length;
+                    console.log('Selected Actor:', subjects[state.selectedActorIndex].id);
+                }
+            });
+
+            setupPanelResizing();
+        }
+
+        function setupPanelResizing() {
+            const panel = document.getElementById('focus-controls');
+            const resizer = document.getElementById('panel-resizer');
+            if (!panel || !resizer) return;
+
+            let isResizing = false;
+
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.body.style.cursor = 'ew-resize';
+                panel.classList.add('select-none');
+                e.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                const width = window.innerWidth - e.clientX - 24;
+                if (width > 280 && width < window.innerWidth * 0.7) {
+                    panel.style.width = width + 'px';
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = 'default';
+                    panel.classList.remove('select-none');
+                }
+            });
+
+            resizer.addEventListener('touchstart', (e) => {
+                isResizing = true;
+                e.preventDefault();
+            });
+
+            window.addEventListener('touchmove', (e) => {
+                if (!isResizing) return;
+                const clientX = e.touches[0].clientX;
+                const width = window.innerWidth - clientX - 24;
+                if (width > 280 && width < window.innerWidth * 0.8) {
+                    panel.style.width = width + 'px';
+                }
+            });
+
+            window.addEventListener('touchend', () => isResizing = false);
+        }
+
+        function setupEnvironmentControls() {
+            elements.btnDayNight.onclick = () => {
+                state.isNight = !state.isNight;
+                const sun = scene.getObjectByName("sun");
+                const ambient = scene.getObjectByName("ambient");
+                const hemi = scene.getObjectByName("hemi");
+                const moon = scene.getObjectByName("moon");
+                const moonBtn = document.getElementById('btn-actor-moon');
+
+                if (state.isNight) {
+                    elements.dayNightIcon.textContent = "🌙";
+                    elements.dayNightText.textContent = "Evening Mode";
+                    scene.background = new THREE.Color(0x080c1a);
+                    scene.fog.color = new THREE.Color(0x080c1a);
+                    sun.intensity = 1.5; // Strong Moon Directional Light
+                    sun.color.setHex(0xb0c4ff); // Cold moonlight
+                    ambient.intensity = 0.4;
+                    hemi.intensity = 0.3;
+                    moon.visible = true;
+                    if (moonBtn) moonBtn.classList.remove('hidden');
+
+                    // MODIFIED NIGHT PRESET (Better visibility than strict Looney 11)
+                    state.aperture = 8.0;
+                    state.iso = 1600;
+                    state.shutterSpeed = 100;
+
+                    // Update UI elements
+                    elements.inputFstop.value = state.aperture;
+                    document.getElementById('val-fstop').textContent = `f/${state.aperture.toFixed(1)}`;
+                    elements.inputIso.value = state.iso;
+                    document.getElementById('val-iso').textContent = state.iso;
+                    document.getElementById('iso-val').textContent = state.iso;
+                    elements.inputShutterSpeed.value = state.shutterSpeed;
+                    document.getElementById('val-shutter-speed').textContent = `1/${state.shutterSpeed}`;
+
+                    // Trigger HUD update
+                    updateFocusDisplay();
+                } else {
+                    elements.dayNightIcon.textContent = "☀️";
+                    elements.dayNightText.textContent = "Day Mode";
+                    scene.background = new THREE.Color(0x87ceeb);
+                    scene.fog.color = new THREE.Color(0x87ceeb);
+                    sun.intensity = 1.5;
+                    sun.color.setHex(0xfff5e6);
+                    ambient.intensity = 0.6;
+                    hemi.intensity = 0.4;
+                    moon.visible = false;
+                    if (moonBtn) moonBtn.classList.add('hidden');
+
+                    // Reset to standard day settings
+                    state.aperture = 4.0;
+                    state.iso = 100;
+                    document.getElementById('val-fstop').textContent = `f/${state.aperture.toFixed(1)}`;
+                    elements.inputFstop.value = state.aperture;
+                }
+                updateCamera();
+            };
+
+            elements.btnMagnifier.onclick = () => {
+                state.isMagnified = !state.isMagnified;
+                elements.magnifierVal.textContent = state.isMagnified ? "10X" : "OFF";
+                elements.btnMagnifier.classList.toggle('bg-yellow-400', state.isMagnified);
+                elements.btnMagnifier.classList.toggle('scale-110', state.isMagnified);
+                updateCamera(); // Apply magnification
+            };
+        }
+
+        function setupFollowFocusWheel() {
+            let wheelDragging = false;
+            let startAngle = 0;
+            let lastFocusDist = 0;
+
+            const onWheelDown = (e) => {
+                wheelDragging = true;
+                const rect = elements.wheel.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const clientX = e.clientX ?? e.touches?.[0].clientX;
+                const clientY = e.clientY ?? e.touches?.[0].clientY;
+                startAngle = Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI);
+                lastFocusDist = state.focusDist;
+                e.preventDefault();
+            };
+
+            const onWheelMove = (e) => {
+                if (!wheelDragging) return;
+                e.preventDefault();
+                const rect = elements.wheel.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                const clientX = e.clientX ?? e.touches?.[0].clientX;
+                const clientY = e.clientY ?? e.touches?.[0].clientY;
+                const currentAngle = Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI);
+
+                let diff = currentAngle - startAngle;
+                if (diff > 180) diff -= 360;
+                if (diff < -180) diff += 360;
+
+                // Rotate the UI mark
+                state.wheelAngle += diff;
+                elements.wheelMark.style.transform = `translateX(-50%) rotate(${state.wheelAngle}deg)`;
+
+                // Update focus distance: 360 degrees = 5m change
+                const focusDelta = (diff / 360) * 10;
+                state.focusDist = Math.max(0.5, Math.min(100, state.focusDist + focusDelta));
+
+                startAngle = currentAngle; // Update for next move
+
+                state.afMode = 'manual';
+                updateFocusSystemUI();
+                updateFocusDisplay();
+            };
+
+            const onWheelUp = () => wheelDragging = false;
+
+            elements.wheel.addEventListener('mousedown', onWheelDown);
+            elements.wheel.addEventListener('touchstart', onWheelDown, { passive: false });
+            window.addEventListener('mousemove', onWheelMove);
+            window.addEventListener('touchmove', onWheelMove, { passive: false });
+            window.addEventListener('mouseup', onWheelUp);
+            window.addEventListener('touchend', onWheelUp);
+        }
+
+        function setupActorAndFocusSystem() {
+            // Actor selection
+            elements.actorBtns.forEach(btn => {
+                btn.onclick = () => {
+                    state.selectedActorIndex = parseInt(btn.dataset.actor);
+                    updateActorSelectionUI();
+                };
+            });
+
+            // Restored Action Buttons
+            elements.btnAutofocusMain.onclick = () => {
+                state.afMode = 'afs';
+                updateFocusSystemUI();
+                performAF();
+            };
+
+            elements.btnRack.onclick = () => {
+                const currentDist = state.focusDist;
+                // Rack focus between current and a target (e.g., 5m or 25m)
+                const target = currentDist > 15 ? 5.0 : 25.0;
+                animateFocus(currentDist, target, 2000);
+            };
+
+            // Move buttons (now on left)
+            const moveSpeed = 0.5;
+            elements.moveBtns.up.onclick = () => {
+                moveActor(0, -moveSpeed);
+                if (state.afMode === 'afc') updateAFContinuous();
+            };
+            elements.moveBtns.down.onclick = () => {
+                moveActor(0, moveSpeed);
+                if (state.afMode === 'afc') updateAFContinuous();
+            };
+            elements.moveBtns.left.onclick = () => {
+                moveActor(-moveSpeed, 0);
+                if (state.afMode === 'afc') updateAFContinuous();
+            };
+            elements.moveBtns.right.onclick = () => {
+                moveActor(moveSpeed, 0);
+                if (state.afMode === 'afc') updateAFContinuous();
+            };
+
+            // Focus Mode
+            elements.focusModeBtns.forEach(btn => {
+                btn.onclick = () => {
+                    state.afMode = btn.dataset.mode;
+                    updateFocusSystemUI();
+                    if (state.afMode === 'afs') performAF();
+                };
+            });
+
+            // AF Detection
+            elements.afDetectBtns.forEach(btn => {
+                btn.onclick = () => {
+                    state.afDetection = btn.dataset.detect;
+                    updateFocusSystemUI();
+                };
+            });
+
+            // AF Area
+            elements.afAreaBtns.forEach(btn => {
+                btn.onclick = () => {
+                    state.afArea = btn.dataset.area;
+                    updateFocusSystemUI();
+                };
+            });
+
+            // A/B Focus Memory Logic
+            const updateShootRackStatus = () => {
+                const isBothSet = state.focusA !== null && state.focusB !== null;
+                elements.btnShootRack.disabled = !isBothSet;
+                if (isBothSet) {
+                    elements.btnShootRack.classList.add('pulse-glow');
+                } else {
+                    elements.btnShootRack.classList.remove('pulse-glow');
+                }
+            };
+
+            elements.btnSetA.onclick = () => {
+                state.focusA = state.focusDist;
+                elements.btnGotoA.disabled = false;
+                elements.btnGotoA.innerHTML = `Point A <span class="text-[8px] bg-indigo-600 text-white px-1 rounded ml-1">${state.focusA.toFixed(1)}m</span>`;
+                elements.btnSetA.classList.add('bg-green-600');
+                updateShootRackStatus();
+                setTimeout(() => elements.btnSetA.classList.remove('bg-green-600'), 500);
+            };
+
+            elements.btnGotoA.onclick = () => {
+                if (state.focusA !== null) {
+                    state.afMode = 'manual';
+                    updateFocusSystemUI();
+                    animateFocus(state.focusDist, state.focusA, 1500);
+                }
+            };
+
+            elements.btnSetB.onclick = () => {
+                state.focusB = state.focusDist;
+                elements.btnGotoB.disabled = false;
+                elements.btnGotoB.innerHTML = `Point B <span class="text-[8px] bg-indigo-600 text-white px-1 rounded ml-1">${state.focusB.toFixed(1)}m</span>`;
+                elements.btnSetB.classList.add('bg-green-600');
+                updateShootRackStatus();
+                setTimeout(() => elements.btnSetB.classList.remove('bg-green-600'), 500);
+            };
+
+            elements.btnGotoB.onclick = () => {
+                if (state.focusB !== null) {
+                    state.afMode = 'manual';
+                    updateFocusSystemUI();
+                    animateFocus(state.focusDist, state.focusB, 1500);
+                }
+            };
+
+            elements.btnShootRack.onclick = () => {
+                if (state.focusA !== null && state.focusB !== null) {
+                    state.afMode = 'manual';
+                    updateFocusSystemUI();
+
+                    // Logic: Go to the point furthest from current focus
+                    const distToA = Math.abs(state.focusDist - state.focusA);
+                    const distToB = Math.abs(state.focusDist - state.focusB);
+                    const targetDist = distToA < distToB ? state.focusB : state.focusA;
+
+                    animateFocus(state.focusDist, targetDist, 2000);
+                }
+            };
+
+            // Reset Logic
+            elements.btnResetA.onclick = () => {
+                state.focusA = null;
+                elements.btnGotoA.disabled = true;
+                elements.btnGotoA.textContent = 'Point A';
+                elements.btnSetA.classList.remove('bg-green-600');
+                updateShootRackStatus();
+            };
+
+            elements.btnResetB.onclick = () => {
+                state.focusB = null;
+                elements.btnGotoB.disabled = true;
+                elements.btnGotoB.textContent = 'Point B';
+                elements.btnSetB.classList.remove('bg-green-600');
+                updateShootRackStatus();
+            };
+        }
+
+        function updateActorSelectionUI() {
+            elements.actorBtns.forEach(btn => {
+                const isMoonBtn = btn.id === 'btn-actor-moon';
+                const isActive = parseInt(btn.dataset.actor) === state.selectedActorIndex;
+
+                if (isActive) {
+                    btn.className = isMoonBtn ?
+                        "actor-btn bg-indigo-600 text-white text-[10px] font-bold py-2 rounded shadow-sm transition" :
+                        "actor-btn bg-blue-600 text-white text-[10px] font-bold py-2 rounded shadow-sm transition";
+                } else {
+                    btn.className = isMoonBtn ?
+                        "actor-btn bg-slate-900 text-white text-[10px] font-bold py-2 rounded shadow-sm hover:bg-slate-800 transition" :
+                        "actor-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded shadow-sm hover:bg-slate-300 transition";
+                }
+            });
+        }
+
+        function updateFocusSystemUI() {
+            elements.focusModeBtns.forEach(btn => {
+                const isActive = btn.dataset.mode === state.afMode;
+                btn.className = isActive ?
+                    "focus-mode-btn bg-blue-600 text-white text-[10px] font-bold py-2.5 rounded transition" :
+                    "focus-mode-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2.5 rounded transition";
+            });
+
+            elements.afDetectBtns.forEach(btn => {
+                const isActive = btn.dataset.detect === state.afDetection;
+                btn.className = isActive ?
+                    "af-detect-btn bg-blue-600 text-white text-[10px] font-bold py-2 rounded transition" :
+                    "af-detect-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded transition";
+            });
+
+            elements.afAreaBtns.forEach(btn => {
+                const isActive = btn.dataset.area === state.afArea;
+                btn.className = isActive ?
+                    "af-area-btn bg-blue-600 text-white text-[10px] font-bold py-2 rounded transition" :
+                    "af-area-btn bg-slate-200 text-slate-700 text-[10px] font-bold py-2 rounded transition";
+            });
+
+            // Update AF Area Box on HUD
+            if (viewMode === '1stPerson' && state.afMode !== 'manual') {
+                elements.afAreaBox.style.display = 'block';
+                elements.afAreaBox.className = 'af-area-box af-area-' + state.afArea;
+
+                // Reset custom inline styles from AF-C tracking
+                elements.afAreaBox.style.borderColor = '';
+                elements.afAreaBox.style.filter = '';
+
+                if (state.afMode === 'afc') {
+                    elements.afAreaBox.classList.add('afc-active');
+                } else {
+                    elements.afAreaBox.classList.remove('afc-active');
+                }
+
+                // Show magnifier button only in 1st person mode
+                elements.btnMagnifier.style.display = 'flex';
+            } else {
+                elements.afAreaBox.style.display = 'none';
+                elements.afAreaBox.classList.remove('afc-active');
+                elements.btnMagnifier.style.display = 'none';
+            }
+        }
+
+        function updateAFButtons() {
+            updateFocusSystemUI();
+        }
+
+        function performAF() {
+            if (subjects.length > 0) {
+                const targetPos = subjects[state.selectedActorIndex].pos;
+                const distance = camera.position.distanceTo(targetPos);
+
+                // Detection profiles
+                let duration = 400;
+                let overshoot = 0;
+
+                if (state.afDetection === 'phase') {
+                    duration = 200; // Snap lock
+                } else if (state.afDetection === 'contrast' || state.isNight) {
+                    duration = state.isNight ? 1800 : 900; // Much slower in dark
+                    overshoot = state.isNight ? 1.5 : 0.5; // More hunting in dark
+                } else { // Hybrid
+                    duration = 450;
+                    overshoot = 0.1;
+                }
+
+                elements.afAreaBox.classList.add('af-hunting');
+
+                if (state.afDetection === 'contrast' || state.isNight) {
+                    // Two-stage animation for contrast hunting
+                    animateFocus(state.focusDist, distance + overshoot, duration * 0.7, () => {
+                        animateFocus(distance + overshoot, distance, duration * 0.3, () => {
+                            lockAF();
+                        });
+                    });
+                } else {
+                    animateFocus(state.focusDist, distance, duration, () => {
+                        lockAF();
+                    });
+                }
+            }
+        }
+
+        function lockAF() {
+            elements.afAreaBox.classList.remove('af-hunting');
+            elements.afAreaBox.classList.add('af-lock');
+            // Brief visual flash for focus lock
+            elements.afAreaBox.style.boxShadow = '0 0 30px #22c55e';
+            setTimeout(() => {
+                elements.afAreaBox.classList.remove('af-lock');
+                elements.afAreaBox.style.boxShadow = '';
+            }, 800);
+        }
+
+        function updateAFContinuous() {
+            if (subjects.length > 0) {
+                const currentActor = subjects[state.selectedActorIndex];
+                const targetPos = currentActor.pos;
+                const distance = camera.position.distanceTo(targetPos);
+
+                // Continuous AF responsiveness
+                let lerpFactor = 0.12;
+                let jitterValue = 0;
+
+                if (state.isNight && currentActor.id === 'moon') {
+                    // AF struggles significantly at night with the moon (simulating low contrast)
+                    lerpFactor = 0.01;
+                    jitterValue = Math.sin(performance.now() * 0.005) * 0.4;
+                } else if (state.afDetection === 'phase') {
+                    lerpFactor = 0.25;
+                } else if (state.afDetection === 'contrast') {
+                    lerpFactor = 0.04;
+                    jitterValue = Math.sin(performance.now() * 0.01) * 0.02;
+                }
+
+                state.focusDist += (distance - state.focusDist + jitterValue) * lerpFactor;
+                updateFocusDisplay();
+
+                // Visual Status Feedback
+                const focusError = Math.abs(distance - state.focusDist);
+
+                if (focusError < 0.25) {
+                    elements.afAreaBox.style.borderColor = '#22c55e'; // Green when locked
+                    elements.afAreaBox.style.filter = 'drop-shadow(0 0 5px #22c55e)';
+                } else {
+                    // In the dark, brackets stay blue or turn red if error is large
+                    elements.afAreaBox.style.borderColor = (state.isNight && focusError > 1.0) ? '#ef4444' : '#3b82f6';
+                    elements.afAreaBox.style.filter = 'none';
+                }
+            }
+        }
+
+        function moveActor(dx, dz) {
+            if (subjects.length > 0) {
+                const actor = subjects[state.selectedActorIndex];
+                actor.mesh.position.x += dx;
+                actor.mesh.position.z += dz;
+                actor.pos.copy(actor.mesh.position).y = 1.6;
+            }
+        }
+
+        function setupModeSwitch() {
+            const parkModeLabel = document.getElementById('park-mode-label');
+            const cameramanModeLabel = document.getElementById('cameraman-mode-label');
+
+            elements.btnMode.onclick = () => {
+                if (viewMode === '3rdPerson') {
+                    viewMode = '1stPerson';
+                    elements.btnMode.textContent = 'Exit Cameraman Mode';
+                    parkModeLabel.classList.add('hidden');
+                    cameramanModeLabel.classList.remove('hidden');
+                    elements.hud.style.display = 'block';
+                    elements.focusControls.classList.remove('hidden');
+                    elements.actorMoveLeftPanel.classList.remove('hidden');
+                    cameramanGroup.visible = false;
+                    state.look = { x: 0, y: 0 };
+                } else {
+                    viewMode = '3rdPerson';
+                    elements.btnMode.textContent = 'Enter Cameraman Mode';
+                    parkModeLabel.classList.remove('hidden');
+                    cameramanModeLabel.classList.add('hidden');
+                    elements.hud.style.display = 'none';
+                    elements.focusControls.classList.add('hidden');
+                    elements.actorMoveLeftPanel.classList.add('hidden');
+                    cameramanGroup.visible = true;
+                    renderer.domElement.style.filter = 'none';
+                    renderer.domElement.style.transform = 'scaleX(1)';
+                }
+                updateCamera();
+            };
+        }
+
+        function setupCameraControls() {
+            // Aperture
+            elements.inputFstop.oninput = (e) => {
+                state.aperture = parseFloat(e.target.value);
+                elements.fstopVal.textContent = `f/${state.aperture.toFixed(1)}`;
+                updateFocusDisplay();
+            };
+
+            // Zoom/Focal Length
+            elements.inputZoom.oninput = (e) => {
+                state.zoom = parseInt(e.target.value);
+                elements.zoomVal.textContent = `${state.zoom}mm`;
+                if (viewMode === '1stPerson') updateCamera();
+            };
+
+            // ISO
+            elements.inputIso.oninput = (e) => {
+                state.iso = parseInt(e.target.value);
+                elements.isoVal.textContent = state.iso;
+                document.getElementById('iso-val').textContent = state.iso;
+            };
+
+            // Shutter Angle
+            elements.inputShutter.oninput = (e) => {
+                state.shutterAngle = parseInt(e.target.value);
+                elements.shutterVal.textContent = `${state.shutterAngle}°`;
+                document.getElementById('shutter-val').textContent = state.shutterAngle;
+            };
+
+            // White Balance
+            elements.inputWb.oninput = (e) => {
+                state.whiteBalance = parseInt(e.target.value);
+                elements.wbVal.textContent = `${state.whiteBalance}K`;
+                document.getElementById('wb-val').textContent = state.whiteBalance;
+            };
+
+            // Shutter Speed
+            elements.inputShutterSpeed.oninput = (e) => {
+                state.shutterSpeed = parseInt(e.target.value);
+                elements.shutterSpeedVal.textContent = `1/${state.shutterSpeed}`;
+
+                // Update shutter angle based on shutter speed (for 24fps)
+                // At 24fps, 180° = 1/48, so we calculate the angle
+                const fps = 24;
+                const angle = Math.round((1 / state.shutterSpeed) * fps * 360);
+                state.shutterAngle = Math.min(360, Math.max(45, angle));
+                elements.inputShutter.value = state.shutterAngle;
+                elements.shutterVal.textContent = `${state.shutterAngle}°`;
+                document.getElementById('shutter-val').textContent = state.shutterAngle;
+            };
+
+            // Aspect Ratio
+            elements.inputAspect.onchange = (e) => {
+                state.aspectRatio = e.target.value;
+                elements.aspectVal.textContent = state.aspectRatio;
+                applyAspectRatio(state.aspectRatio);
+            };
+
+            // Depth of Field Presets
+            elements.btnShallow.onclick = () => {
+                // Real camera logic: Wide aperture + slightly longer lens for compressed shallow effect
+                animateValue(state.aperture, 1.8, 800, (v) => {
+                    state.aperture = v;
+                    elements.inputFstop.value = v;
+                    elements.fstopVal.textContent = `f/${v.toFixed(1)}`;
+                    updateFocusDisplay();
+                });
+                // If zoom is too wide, punch in a bit for better shallow effect
+                if (state.zoom < 50) {
+                    animateValue(state.zoom, 85, 1000, (v) => {
+                        state.zoom = v;
+                        elements.inputZoom.value = v;
+                        elements.zoomVal.textContent = `${Math.round(v)}mm`;
+                        updateCamera();
+                    });
+                }
+            };
+
+            elements.btnDeep.onclick = () => {
+                // Real camera logic: Small aperture for deep focus
+                animateValue(state.aperture, 11.0, 800, (v) => {
+                    state.aperture = v;
+                    elements.inputFstop.value = v;
+                    elements.fstopVal.textContent = `f/${v.toFixed(1)}`;
+                    updateFocusDisplay();
+                });
+            };
+
+            // Photo Button
+            elements.btnPhoto.onclick = () => {
+                if (viewMode !== '1stPerson') return;
+
+                // Flash effect
+                const flash = document.createElement('div');
+                flash.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+                document.body.appendChild(flash);
+
+                setTimeout(() => flash.remove(), 100);
+
+                // Take screenshot
+                try {
+                    renderer.domElement.toBlob((blob) => {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `photo_${Date.now()}.png`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    });
+                } catch (err) {
+                    console.log('Photo captured (download disabled in demo)');
+                }
+            };
+
+            // Record Button
+            elements.btnRecord.onclick = () => {
+                if (viewMode !== '1stPerson') return;
+
+                state.isRecording = !state.isRecording;
+
+                if (state.isRecording) {
+                    elements.btnRecord.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    elements.btnRecord.classList.add('bg-green-600', 'hover:bg-green-700');
+                    elements.recordIcon.textContent = '⏹';
+                    elements.recordText.textContent = 'Stop';
+
+                    // Show REC indicator
+                    document.querySelector('.rec-dot').style.display = 'inline-block';
+                    document.querySelector('.text-red-600').style.display = 'inline';
+
+                    // Reset timecode
+                    state.timecode = { h: 0, m: 0, s: 0, f: 0 };
+                } else {
+                    elements.btnRecord.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    elements.btnRecord.classList.add('bg-red-600', 'hover:bg-red-700');
+                    elements.recordIcon.textContent = '⏺';
+                    elements.recordText.textContent = 'Record';
+                }
+            };
+
+            // Quick Focus Actions (Now handled by AF System)
+            // Removed redundant handlers for replaced UI elements
+
+            // Peaking
+            elements.btnPeak.onclick = () => {
+                state.isPeaking = !state.isPeaking;
+                elements.btnPeak.textContent = state.isPeaking ? 'Peaking OFF' : 'Peaking ON';
+                elements.btnPeak.classList.toggle('bg-green-700', state.isPeaking);
+                elements.btnPeak.classList.toggle('text-white', state.isPeaking);
+                elements.peakingCanvas.classList.toggle('active', state.isPeaking);
+            };
+
+            // Zebra
+            elements.btnZebra.onclick = () => {
+                state.isZebra = !state.isZebra;
+                elements.btnZebra.textContent = state.isZebra ? 'Zebras OFF' : 'Zebras ON';
+                elements.btnZebra.classList.toggle('bg-yellow-600', state.isZebra);
+                elements.btnZebra.classList.toggle('text-white', state.isZebra);
+                elements.zebraOverlay.style.display = state.isZebra ? 'block' : 'none';
+            };
+
+            // Singlish Controls
+            // SNAP LAH - Take photo button
+            const btnSnapLah = document.getElementById('btn-snap-lah');
+            if (btnSnapLah) {
+                btnSnapLah.onclick = () => {
+                    if (viewMode !== '1stPerson') return;
+
+                    // Flash effect
+                    const flash = document.createElement('div');
+                    flash.style.cssText = 'position:fixed;inset:0;background:white;z-index:9999;pointer-events:none;';
+                    document.body.appendChild(flash);
+
+                    setTimeout(() => flash.remove(), 100);
+
+                    // Take screenshot
+                    try {
+                        renderer.domElement.toBlob((blob) => {
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `snap-lah_${Date.now()}.png`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                        });
+                    } catch (err) {
+                        console.log('Snap lah! (download disabled in demo)');
+                    }
+                };
+            }
+
+            // REC LIAO - Record button
+            const btnRecLiao = document.getElementById('btn-record-liao');
+            const recLiaoIcon = document.getElementById('record-liao-icon');
+            const recLiaoText = document.getElementById('record-liao-text');
+            if (btnRecLiao) {
+                btnRecLiao.onclick = () => {
+                    if (viewMode !== '1stPerson') return;
+
+                    state.isRecording = !state.isRecording;
+
+                    if (state.isRecording) {
+                        btnRecLiao.classList.remove('bg-orange-600', 'hover:bg-orange-700');
+                        btnRecLiao.classList.add('bg-green-600', 'hover:bg-green-700');
+                        recLiaoIcon.textContent = '■';
+                        recLiaoText.textContent = 'STOP LAH';
+
+                        // Show REC indicator
+                        document.querySelector('.rec-dot').style.display = 'inline-block';
+                        document.querySelector('.text-red-600').style.display = 'inline';
+
+                        // Reset timecode
+                        state.timecode = { h: 0, m: 0, s: 0, f: 0 };
+                    } else {
+                        btnRecLiao.classList.remove('bg-green-600', 'hover:bg-green-700');
+                        btnRecLiao.classList.add('bg-orange-600', 'hover:bg-orange-700');
+                        recLiaoIcon.textContent = '●';
+                        recLiaoText.textContent = 'REC LIAO';
+                    }
+                };
+            }
+
+            // SHUTTER AH - Cycle through shutter speeds
+            const btnShutterAh = document.getElementById('btn-shutter-ah');
+            const shutterSpeeds = [24, 48, 50, 100, 200, 500, 1000, 2000, 4000, 8000];
+            let currentShutterIndex = 1; // Start at 48 (1/48)
+            if (btnShutterAh) {
+                btnShutterAh.onclick = () => {
+                    currentShutterIndex = (currentShutterIndex + 1) % shutterSpeeds.length;
+                    state.shutterSpeed = shutterSpeeds[currentShutterIndex];
+                    elements.inputShutterSpeed.value = state.shutterSpeed;
+                    elements.shutterSpeedVal.textContent = `1/${state.shutterSpeed}`;
+
+                    // Update shutter angle based on shutter speed (for 24fps)
+                    const fps = 24;
+                    const angle = Math.round((1 / state.shutterSpeed) * fps * 360);
+                    state.shutterAngle = Math.min(360, Math.max(45, angle));
+                    elements.inputShutter.value = state.shutterAngle;
+                    elements.shutterVal.textContent = `${state.shutterAngle}°`;
+                    document.getElementById('shutter-val').textContent = state.shutterAngle;
+                };
+            }
+
+            // GRID LOR - Toggle 3x3 grid overlay
+            const btnGridLor = document.getElementById('btn-grid-lor');
+            const gridOverlay = document.getElementById('grid-overlay');
+            const gridLorText = document.getElementById('grid-lor-text');
+            let isGridOn = false;
+            if (btnGridLor && gridOverlay) {
+                btnGridLor.onclick = () => {
+                    isGridOn = !isGridOn;
+                    gridOverlay.classList.toggle('active', isGridOn);
+                    btnGridLor.classList.toggle('bg-green-600', isGridOn);
+                    btnGridLor.classList.toggle('hover:bg-green-700', isGridOn);
+                    btnGridLor.classList.toggle('bg-pink-600', !isGridOn);
+                    btnGridLor.classList.toggle('hover:bg-pink-700', !isGridOn);
+                    gridLorText.textContent = isGridOn ? 'HIDE LAH' : 'GRID LOR';
+                };
+            }
+        }
+
+        function setupPresets() {
+            const presets = {
+                portrait: { aperture: 1.8, zoom: 85, iso: 100, shutter: 180, wb: 5000 },
+                landscape: { aperture: 11, zoom: 24, iso: 100, shutter: 180, wb: 5600 },
+                cinematic: { aperture: 2.8, zoom: 50, iso: 800, shutter: 180, wb: 4500 },
+                sports: { aperture: 4, zoom: 135, iso: 1600, shutter: 90, wb: 5600 }
+            };
+
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.onclick = () => {
+                    const preset = presets[btn.dataset.preset];
+                    if (preset) {
+                        state.aperture = preset.aperture;
+                        state.zoom = preset.zoom;
+                        state.iso = preset.iso;
+                        state.shutterAngle = preset.shutter;
+                        state.whiteBalance = preset.wb;
+
+                        elements.inputFstop.value = preset.aperture;
+                        elements.inputZoom.value = preset.zoom;
+                        elements.inputIso.value = preset.iso;
+                        elements.inputShutter.value = preset.shutter;
+                        elements.inputWb.value = preset.wb;
+
+                        elements.fstopVal.textContent = `f/${preset.aperture.toFixed(1)}`;
+                        elements.zoomVal.textContent = `${preset.zoom}mm`;
+                        elements.isoVal.textContent = preset.iso;
+                        elements.shutterVal.textContent = `${preset.shutter}°`;
+                        elements.wbVal.textContent = `${preset.wb}K`;
+
+                        document.getElementById('iso-val').textContent = preset.iso;
+                        document.getElementById('shutter-val').textContent = preset.shutter;
+                        document.getElementById('wb-val').textContent = preset.wb;
+
+                        if (viewMode === '1stPerson') updateCamera();
+                        updateFocusDisplay();
+                    }
+                };
+            });
+        }
+
+        function setupAdvancedSettings() {
+            const settingsModal = document.getElementById('settings-modal');
+            const btnSettings = document.getElementById('btn-settings');
+            const closeSettings = document.getElementById('close-settings');
+
+            // Open/Close modal
+            btnSettings.onclick = () => {
+                settingsModal.classList.remove('hidden');
+            };
+
+            closeSettings.onclick = () => {
+                settingsModal.classList.add('hidden');
+            };
+
+            // Click outside to close
+            settingsModal.onclick = (e) => {
+                if (e.target === settingsModal) {
+                    settingsModal.classList.add('hidden');
+                }
+            };
+
+            // Sensor Format
+            document.querySelectorAll('.sensor-format-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.sensor-format-btn').forEach(b => {
+                        b.classList.remove('bg-yellow-500', 'text-black');
+                        b.classList.add('bg-slate-700', 'text-white');
+                    });
+                    btn.classList.remove('bg-slate-700', 'text-white');
+                    btn.classList.add('bg-yellow-500', 'text-black');
+                    state.sensorFormat = btn.dataset.format;
+
+                    // Adjust FOV based on sensor format
+                    if (viewMode === '1stPerson') {
+                        updateCamera();
+                    }
+                };
+            });
+
+            // Exposure Index
+            document.querySelectorAll('.ei-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.ei-btn').forEach(b => {
+                        b.classList.remove('bg-yellow-500', 'text-black');
+                        b.classList.add('bg-slate-700', 'text-white');
+                    });
+                    btn.classList.remove('bg-slate-700', 'text-white');
+                    btn.classList.add('bg-yellow-500', 'text-black');
+
+                    const ei = parseInt(btn.dataset.ei);
+                    state.exposureIndex = ei;
+                    state.iso = ei;
+                    elements.inputIso.value = ei;
+                    elements.isoVal.textContent = ei;
+                    document.getElementById('iso-val').textContent = ei;
+                };
+            });
+
+            // White Balance Presets
+            document.querySelectorAll('.wb-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.wb-btn').forEach(b => {
+                        b.classList.remove('bg-yellow-500', 'text-black');
+                        b.classList.add('bg-slate-700', 'text-white');
+                    });
+                    btn.classList.remove('bg-slate-700', 'text-white');
+                    btn.classList.add('bg-yellow-500', 'text-black');
+
+                    const wb = parseInt(btn.dataset.wb);
+                    state.whiteBalance = wb;
+                    elements.inputWb.value = wb;
+                    elements.wbVal.textContent = `${wb}K`;
+                    document.getElementById('wb-val').textContent = wb;
+                };
+            });
+
+            // Shutter Angle Presets
+            document.querySelectorAll('.shutter-btn').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.shutter-btn').forEach(b => {
+                        b.classList.remove('bg-yellow-500', 'text-black');
+                        b.classList.add('bg-slate-700', 'text-white');
+                    });
+                    btn.classList.remove('bg-slate-700', 'text-white');
+                    btn.classList.add('bg-yellow-500', 'text-black');
+
+                    const shutter = parseInt(btn.dataset.shutter);
+                    state.shutterAngle = shutter;
+                    elements.inputShutter.value = shutter;
+                    elements.shutterVal.textContent = `${shutter}°`;
+                    document.getElementById('shutter-val').textContent = shutter;
+                };
+            });
+
+            // Visual Aids
+            const visualAids = {
+                'modal-false-color': 'falseColor',
+                'modal-zebra': 'isZebra',
+                'modal-lut-preview': 'lutPreview',
+                'modal-desqueeze': 'anamorphicDesqueeze',
+                'modal-histogram': 'showHistogram',
+                'modal-waveform': 'showWaveform'
+            };
+
+            Object.entries(visualAids).forEach(([btnId, stateProp]) => {
+                const btn = document.getElementById(btnId);
+                btn.onclick = () => {
+                    state[stateProp] = !state[stateProp];
+
+                    if (state[stateProp]) {
+                        btn.classList.remove('bg-slate-700');
+                        btn.classList.add('bg-green-600');
+                    } else {
+                        btn.classList.remove('bg-green-600');
+                        btn.classList.add('bg-slate-700');
+                    }
+
+                    // Apply specific effects
+                    if (stateProp === 'isZebra') {
+                        elements.zebraOverlay.style.display = state.isZebra ? 'block' : 'none';
+                    }
+                    if (stateProp === 'showHistogram') {
+                        elements.histogram.style.display = state.showHistogram ? 'block' : 'none';
+                    }
+                };
+            });
+        }
+
+        function applyAspectRatio(ratio) {
+            const hud = elements.hud;
+            let topBottom = 38; // default border
+
+            switch (ratio) {
+                case '3:1':
+                    topBottom = 200; // Much wider letterbox
+                    break;
+                case '2.39:1':
+                    topBottom = 140;
+                    break;
+                case '1.85:1':
+                    topBottom = 100;
+                    break;
+                case '4:3':
+                    topBottom = 20;
+                    break;
+                case '16:9':
+                default:
+                    topBottom = 38;
+                    break;
+            }
+
+            hud.style.borderTopWidth = `${topBottom}px`;
+            hud.style.borderBottomWidth = `${topBottom}px`;
+        }
+
+        function updateFocusDisplay() {
+            if (state.focusDist > 98) {
+                elements.distLabel.innerHTML = '&infin;';
+            } else {
+                elements.distLabel.textContent = state.focusDist.toFixed(1);
+            }
+
+            // Fix pointer range: 0.5m to 100m scale.
+            const percentage = Math.max(0, Math.min(100, (state.focusDist - 0.5) / 99.5 * 100));
+            elements.focusPtr.style.left = `${percentage}%`;
+
+            // Calculate depth of field
+            const dof = calculateDoF(state.focusDist, state.aperture, state.zoom);
+            elements.dofLabel.textContent = dof.toFixed(1);
+        }
+
+        function calculateDoF(distance, aperture, focalLength) {
+            const coc = 0.03; // mm
+            const distMm = distance * 1000;
+            const H = (focalLength * focalLength) / (aperture * coc) + focalLength;
+
+            const nearLimit = (H * distMm) / (H + (distMm - focalLength));
+            let farLimit = (H * distMm) / (H - (distMm - focalLength));
+
+            // If denominator is negative or zero, far limit is infinity
+            if (H <= (distMm - focalLength)) {
+                farLimit = distMm * 1000; // Large number for infinity logic
+            }
+
+            const dofRange = (farLimit - nearLimit) / 1000;
+            return Math.min(dofRange, 99.9);
+        }
+
+        function animateValue(start, end, duration, onUpdate) {
+            const startTime = performance.now();
+            function update(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+                const current = start + (end - start) * ease;
+                onUpdate(current);
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        function animateFocus(start, end, duration, callback) {
+            const startTime = performance.now();
+            function update(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                // Ease in-out cubic for cinematic rack focus feel
+                const ease = progress < 0.5
+                    ? 4 * progress * progress * progress
+                    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+                state.focusDist = start + (end - start) * ease;
+                updateFocusDisplay();
+
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else if (callback) {
+                    callback();
+                }
+            }
+            requestAnimationFrame(update);
+        }
+
+        function setupHistogram() {
+            // Create histogram bars
+            for (let i = 0; i < 100; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'histogram-bar';
+                bar.style.left = `${i}%`;
+                bar.style.height = '0%';
+                elements.histogram.appendChild(bar);
+            }
+        }
+
+        function updateHistogram() {
+            // Simulate histogram based on scene brightness
+            const bars = elements.histogram.querySelectorAll('.histogram-bar');
+            bars.forEach((bar, i) => {
+                const randomHeight = 20 + Math.random() * 60 + Math.sin(i * 0.1) * 20;
+                bar.style.height = `${randomHeight}%`;
+            });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // ANIMATION LOOP
+        // ═══════════════════════════════════════════════════════════════
+        let lastTime = 0;
+        let frameCount = 0;
+        let fpsUpdateTime = 0;
+
+        function animate(currentTime = 0) {
+            requestAnimationFrame(animate);
+
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            // FPS counter
+            frameCount++;
+            fpsUpdateTime += deltaTime;
+            if (fpsUpdateTime >= 1000) {
+                const fps = (frameCount / fpsUpdateTime * 1000).toFixed(1);
+                elements.fpsCounter.textContent = `${fps} fps`;
+                frameCount = 0;
+                fpsUpdateTime = 0;
+            }
+
+            const t = clock.getElapsedTime();
+
+            // Animate trees (wind effect)
+            trees.forEach((tree, i) => {
+                const windStrength = 0.03;
+                tree.rotation.z = Math.sin(t * 1.2 + i * 2) * windStrength;
+                tree.rotation.x = Math.cos(t * 0.8 + i * 1.5) * windStrength;
+            });
+
+            // Animate actors (subtle movements)
+            subjects.forEach((subject, i) => {
+                const breathing = Math.sin(t * 2 + i) * 0.01;
+                subject.mesh.position.y = breathing;
+
+                // Arm sway
+                if (subject.leftArm && subject.rightArm) {
+                    subject.leftArm.rotation.z = Math.sin(t * 1.5 + i) * 0.1;
+                    subject.rightArm.rotation.z = -Math.sin(t * 1.5 + i) * 0.1;
+                }
+            });
+
+            // Handle AF Continuous
+            if (state.afMode === 'afc') {
+                updateAFContinuous();
+            }
+
+            // Timecode
+            if (viewMode === '1stPerson' && state.isRecording) {
+                state.timecode.f++;
+                if (state.timecode.f >= 24) {
+                    state.timecode.f = 0;
+                    state.timecode.s++;
+                }
+                if (state.timecode.s >= 60) {
+                    state.timecode.s = 0;
+                    state.timecode.m++;
+                }
+                if (state.timecode.m >= 60) {
+                    state.timecode.m = 0;
+                    state.timecode.h++;
+                }
+
+                elements.tc.textContent =
+                    `${String(state.timecode.h).padStart(2, '0')}:` +
+                    `${String(state.timecode.m).padStart(2, '0')}:` +
+                    `${String(state.timecode.s).padStart(2, '0')}:` +
+                    `${String(state.timecode.f).padStart(2, '0')}`;
+
+                // Battery drain simulation
+                if (Math.random() < 0.001) {
+                    const current = parseInt(elements.batteryPct.textContent);
+                    if (current > 0) {
+                        const newVal = current - 1;
+                        elements.batteryPct.textContent = `${newVal}%`;
+                        elements.batteryLevel.style.width = `${newVal}%`;
+
+                        if (newVal < 20) {
+                            elements.batteryLevel.classList.remove('bg-green-600');
+                            elements.batteryLevel.classList.add('bg-red-600');
+                        }
+                    }
+                }
+
+                // Update histogram occasionally
+                if (Math.floor(t * 2) % 5 === 0 && Math.random() < 0.1) {
+                    updateHistogram();
+                }
+            }
+
+            // Apply depth of field effect (including ISO brightness) in cameraman mode
+            if (viewMode === '1stPerson') {
+                applyDepthOfField();
+            } else {
+                renderer.domElement.style.filter = 'none';
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function applyDepthOfField() {
+            if (!subjects.length) return;
+
+            // CRITICAL: Calculate focus error relative to the SELECTED actor, not just index 0
+            const currentActor = subjects[state.selectedActorIndex];
+            if (!currentActor) return;
+
+            const realDist = camera.position.distanceTo(currentActor.pos);
+            const focusError = Math.abs(realDist - state.focusDist);
+
+            // Calculate blur amount based on aperture and focus error
+            const blurIntensity = focusError * (20 / state.aperture) * (state.aperture < 4 ? 1.8 : 1.2);
+            const blurPx = Math.min(blurIntensity, 35);
+
+            // Adjust brightness based on ISO (using actual ISO value from state)
+            const actualISO = state.iso; // Use the actual ISO from state
+            // Map ISO 0-256000 to brightness multiplier: ISO 0 = very dark (0.1x), ISO 100 = normal (1.0x), ISO 256000 = very bright (5.0x)
+            let isoBrightness;
+            if (actualISO <= 100) {
+                // 0-100: scale from 0.4 to 1.0 (Less dark)
+                isoBrightness = 0.4 + (actualISO / 100) * 0.6;
+            } else {
+                // 100-256000: scale from 1.0 to 6.0
+                isoBrightness = 1.0 + ((actualISO - 100) / 255900) * 5.0;
+            }
+
+            // Adjust for shutter speed (faster shutter = darker)
+            const shutterBrightness = Math.max(0.3, Math.min(2.0, 50 / state.shutterSpeed));
+
+            // White balance tint
+            let wbFilter = '';
+            if (state.whiteBalance < 4000) {
+                wbFilter = 'sepia(0.3) saturate(1.2)';
+            } else if (state.whiteBalance > 7000) {
+                wbFilter = 'hue-rotate(200deg) saturate(0.9)';
+            }
+
+            // Sensor format crop (affects FOV)
+            const sensorCrop = state.sensorFormat === 'super35' ? 1.5 : 1.0;
+
+            // False Color effect
+            let falseColorFilter = '';
+            if (state.falseColor) {
+                falseColorFilter = 'hue-rotate(90deg) saturate(2) contrast(1.5)';
+            }
+
+            // LUT Preview effect (simulated film look)
+            let lutFilter = '';
+            if (state.lutPreview) {
+                lutFilter = 'contrast(1.15) brightness(0.95) saturate(1.1) sepia(0.05)';
+            }
+
+            // Anamorphic Desqueeze (visual effect)
+            if (state.anamorphicDesqueeze) {
+                renderer.domElement.style.transform = 'scaleX(1.33)';
+            } else {
+                renderer.domElement.style.transform = 'scaleX(1)';
+            }
+
+            // Combine all effects
+            const finalBrightness = isoBrightness * shutterBrightness;
+            const filters = [
+                `blur(${blurPx}px)`,
+                `brightness(${finalBrightness})`,
+                `contrast(${1.05 + (state.aperture > 8 ? 0.15 : 0)})`,
+                wbFilter,
+                falseColorFilter,
+                lutFilter
+            ].filter(Boolean).join(' ');
+
+            renderer.domElement.style.filter = filters;
+
+            // Peaking effect
+            if (state.isPeaking) {
+                const peakStrength = Math.max(0, 1 - focusError * 1.5);
+                renderer.domElement.style.filter += ` saturate(${1 + peakStrength * 1.2}) brightness(${Math.min(finalBrightness * 1.1, 2.5)})`;
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // WINDOW RESIZE
+        // ═══════════════════════════════════════════════════════════════
+        function handleResize() {
+            if (!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('resize', handleResize);
+
+        // ═══════════════════════════════════════════════════════════════
+        // CAMERA ANATOMY SIMULATION
+        // ═══════════════════════════════════════════════════════════════
+        const anatomyState = {
+            isOpen: false,
+            viewMode: 'standard',
+            isRotating: true,
+            focusDistance: 5.0,
+            explodeFactor: 0
+        };
+
+        let anatomyScene, anatomyCamera, anatomyRenderer, anatomyControls;
+        let anatomyModel = new THREE.Group();
+        let anatomyLensElements = [];
+        let anatomyLightRays = new THREE.Group();
+
+        function initAnatomy() {
+            const container = document.getElementById('anatomy-canvas-container');
+            if (anatomyRenderer) return; // Prevent double init
+
+            anatomyScene = new THREE.Scene();
+            anatomyScene.background = null; // Transparent to see CSS gradient
+
+            anatomyCamera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 0.1, 1000);
+            anatomyCamera.position.set(12, 8, 15);
+
+            anatomyRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            anatomyRenderer.setSize(container.clientWidth, container.clientHeight);
+            anatomyRenderer.setPixelRatio(window.devicePixelRatio);
+            anatomyRenderer.outputEncoding = THREE.sRGBEncoding;
+            container.appendChild(anatomyRenderer.domElement);
+
+            anatomyControls = new THREE.OrbitControls(anatomyCamera, anatomyRenderer.domElement);
+            anatomyControls.enableDamping = true;
+            anatomyControls.dampingFactor = 0.05;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+            anatomyScene.add(ambientLight);
+
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            mainLight.position.set(5, 10, 7);
+            anatomyScene.add(mainLight);
+
+            const accentLight = new THREE.PointLight(0x6366f1, 2, 20);
+            accentLight.position.set(-5, 5, -5);
+            anatomyScene.add(accentLight);
+
+            createAnatomyModel();
+            setupAnatomyControls();
+
+            animateAnatomy();
+        }
+
+        // Helper to create procedural textures
+        function createProceduralTexture(type) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            if (type === 'sensor') {
+                // Iridescent Bayer Pattern
+                ctx.fillStyle = '#101010';
+                ctx.fillRect(0, 0, 512, 512);
+                // Grid
+                const size = 16;
+                for (let y = 0; y < 512; y += size) {
+                    for (let x = 0; x < 512; x += size) {
+                        // Bayer-ish pattern
+                        const isG = (x / size + y / size) % 2 === 0;
+                        const isR = (x / size) % 2 === 0 && !isG;
+                        ctx.fillStyle = isG ? '#1a2a1a' : (isR ? '#2a1a1a' : '#1a1a2a');
+                        ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+
+                        // Micro-lens reflection
+                        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                        ctx.beginPath();
+                        ctx.arc(x + size / 2, y + size / 2, size / 3, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                // Vignette/Optical Center
+                const grad = ctx.createRadialGradient(256, 256, 100, 256, 256, 400);
+                grad.addColorStop(0, 'rgba(0,255,100,0.0)');
+                grad.addColorStop(1, 'rgba(100,0,255,0.2)'); // Purple fringe
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 512, 512);
+            } else if (type === 'pcb') {
+                // PCB Traces
+                ctx.fillStyle = '#002200'; // Dark Green
+                ctx.fillRect(0, 0, 512, 512);
+
+                ctx.strokeStyle = '#aa8800'; // Gold
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                for (let i = 0; i < 40; i++) {
+                    const y = Math.random() * 512;
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(Math.random() * 200, y);
+                    ctx.lineTo(Math.random() * 400, Math.random() * 512);
+                    ctx.lineTo(512, Math.random() * 512);
+                }
+                ctx.stroke();
+
+                // Mounting holes
+                ctx.fillStyle = '#111';
+                ctx.beginPath();
+                ctx.arc(50, 50, 20, 0, Math.PI * 2);
+                ctx.arc(462, 50, 20, 0, Math.PI * 2);
+                ctx.arc(50, 462, 20, 0, Math.PI * 2);
+                ctx.arc(462, 462, 20, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        function createAnatomyModel() {
+            anatomyModel = new THREE.Group();
+            anatomyLensElements = [];
+
+            // --- High-Fidelity Materials ---
+            // Body: Matte Finish with rough texture (Cinema Camera Grey)
+            const matBody = new THREE.MeshStandardMaterial({
+                color: 0x222222, roughness: 0.7, metalness: 0.3, name: 'matBody'
+            });
+            // Grip/Details: Carbon fiber or rubber
+            const matDark = new THREE.MeshStandardMaterial({
+                color: 0x111111, roughness: 0.9, metalness: 0, name: 'matBodyGrip'
+            });
+            // Glass: Thicker, more physical
+            const matGlass = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff, transmission: 0.98, transparent: true, opacity: 0.3,
+                roughness: 0.0, metalness: 0, clearcoat: 1.0, clearcoatRoughness: 0.0,
+                ior: 1.5, thickness: 3.5, name: 'matGlass', side: THREE.DoubleSide
+            });
+            // Mount/Rims: Silver/Steel
+            const matMetal = new THREE.MeshStandardMaterial({
+                color: 0xaaaaaa, roughness: 0.3, metalness: 0.9, name: 'matRim'
+            });
+            // Gold Contacts
+            const matGold = new THREE.MeshStandardMaterial({
+                color: 0xffd700, metalness: 1.0, roughness: 0.2, name: 'matGold'
+            });
+            // Sensor: Iridescent
+            const matSensor = new THREE.MeshStandardMaterial({
+                color: 0x111111, roughness: 0.2, metalness: 0.8, name: 'matSensor'
+            });
+            // LCD Screen (Emissive)
+            const matScreen = new THREE.MeshStandardMaterial({
+                color: 0x000000, emissive: 0x222222, roughness: 0.2, name: 'matScreen'
+            });
+            const texPCB = createProceduralTexture('pcb');
+            const matPCB = new THREE.MeshStandardMaterial({
+                map: texPCB,
+                roughness: 0.4,
+                metalness: 0.3,
+                name: 'matPCB'
+            });
+            // Filters: OLPF & IR Cut
+            const matIRCut = new THREE.MeshPhysicalMaterial({
+                color: 0x00ffff, transmission: 0.9, transparent: true, opacity: 0.2, name: 'matIR'
+            });
+            const matOLPF = new THREE.MeshPhysicalMaterial({
+                color: 0xffffff, transmission: 0.8, transparent: true, opacity: 0.1, name: 'matOLPF'
+            });
+            // Button/Tally materials
+            const matRed = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0x440000, name: 'matRed' });
+            const matTally = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, name: 'matTally' });
+
+            // --- CAMERA BODY (Cinema Cube Style) ---
+            const bodyGroup = new THREE.Group();
+            bodyGroup.userData.type = 'body';
+
+            // 1. Main Chassis - Larger Cube
+            const bodyGeo = new THREE.BoxGeometry(6.5, 5.0, 4.0);
+            const bodyMain = new THREE.Mesh(bodyGeo, matBody);
+            bodyGroup.add(bodyMain);
+
+            // 2. Rear LCD Panel (Back of Camera, facing -Z)
+            const lcdGroup = new THREE.Group();
+            lcdGroup.position.set(0, 0, -2.01); // Flush with back face
+            // Monitor Frame
+            const lcdBezel = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.0, 0.2), matDark);
+            lcdBezel.position.z = -0.1;
+            lcdGroup.add(lcdBezel);
+            // Screen (Facing -Z)
+            const matScreenData = matScreen.clone();
+            matScreenData.emissiveMap = createProceduralTexture('sensor');
+            const lcdScreen = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 2.6), matScreenData);
+            lcdScreen.rotation.y = Math.PI; // Face backwards towards user
+            lcdScreen.position.z = -0.211;
+            lcdGroup.add(lcdScreen);
+            bodyGroup.add(lcdGroup);
+
+            // 3. Side Controls & I/O (Right & Left)
+            const sideControls = new THREE.Group();
+            sideControls.position.set(3.26, 0, 0); // Right side
+            // Jog Wheel
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.4, 32), matDark);
+            wheel.rotation.z = Math.PI / 2;
+            wheel.position.set(0.2, -1.0, 0);
+            sideControls.add(wheel);
+            // Navigation Buttons (D-Pad)
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.3), matDark);
+                b.position.set(0.1, -1.0 + Math.sin(angle) * 0.5, Math.cos(angle) * 0.5);
+                sideControls.add(b);
+            }
+            bodyGroup.add(sideControls);
+
+            // 3.5 I/O Ports (Left Side)
+            const ioGroup = new THREE.Group();
+            ioGroup.position.set(-3.26, 0, 0);
+            const portGeo = new THREE.BoxGeometry(0.1, 0.4, 0.6);
+            for (let i = 0; i < 3; i++) {
+                const p = new THREE.Mesh(portGeo, matDark);
+                p.position.y = 1.0 - i * 0.8;
+                ioGroup.add(p);
+            }
+            bodyGroup.add(ioGroup);
+
+            // 3.6 Rubberized Grip
+            const gripMat = matDark.clone();
+            gripMat.roughness = 1.0;
+            const grip = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.0, 3.0), gripMat);
+            grip.position.set(-3.0, 0, 0.5);
+            bodyGroup.add(grip);
+
+            // 4. Gold Plating & Outlines
+            const plating = new THREE.Group();
+            // Gold strips on corners
+            const goldStripGeo = new THREE.BoxGeometry(0.1, 5.1, 0.2);
+            for (let i = 0; i < 2; i++) {
+                const s = new THREE.Mesh(goldStripGeo, matGold);
+                s.position.set(3.26 * (i === 0 ? 1 : -1), 0, 2.0);
+                plating.add(s);
+            }
+            // Black outline rings for lens
+            const outlineRing = new THREE.Mesh(new THREE.TorusGeometry(3.05, 0.05, 16, 64), matDark);
+            outlineRing.rotation.x = Math.PI / 2;
+            outlineRing.position.z = 2.45; // Over the adapter
+            bodyGroup.add(outlineRing);
+            bodyGroup.add(plating);
+
+            // 5. Sensor & Optical Filters (Heart of the Box)
+            const sensorGroup = new THREE.Group();
+            sensorGroup.position.z = 1.0;
+            // Sensor Frame
+            const sFrame = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.2, 0.4), matMetal);
+            sFrame.position.z = -0.2;
+            sensorGroup.add(sFrame);
+            // Sensor Chip
+            const sChip = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 2.6), matSensor);
+            sChip.position.z = 0.01;
+            sensorGroup.add(sChip);
+            // IR Cut & OLPF Layers
+            const irFilter = new THREE.Mesh(new THREE.PlaneGeometry(3.7, 2.5), matIRCut);
+            irFilter.position.z = 0.15;
+            sensorGroup.add(irFilter);
+            const olpfFilter = new THREE.Mesh(new THREE.PlaneGeometry(3.7, 2.5), matOLPF);
+            olpfFilter.position.z = 0.25;
+            sensorGroup.add(olpfFilter);
+
+            bodyGroup.add(sensorGroup);
+
+            // 6. Internal Target Plate & Cooling System
+            const coolingGroup = new THREE.Group();
+            coolingGroup.position.z = 0.5;
+            // Target Plate (Gold Plated)
+            const plate = new THREE.Mesh(new THREE.BoxGeometry(4.8, 3.8, 0.1), matGold);
+            coolingGroup.add(plate);
+            // Heatsink Fins
+            const finGeo = new THREE.BoxGeometry(4.0, 0.05, 0.8);
+            for (let i = 0; i < 15; i++) {
+                const fin = new THREE.Mesh(finGeo, matMetal);
+                fin.position.set(0, -1.5 + i * 0.2, -0.45);
+                coolingGroup.add(fin);
+            }
+            // Fan Detail
+            const fan = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.2, 32), matDark);
+            fan.rotation.x = Math.PI / 2;
+            fan.position.set(0, 0, -1.0);
+            coolingGroup.add(fan);
+            bodyGroup.add(coolingGroup);
+
+            // 7. Processing Engine & PCB
+            const pcbGroup = new THREE.Group();
+            pcbGroup.position.z = -0.5;
+            const pcb = new THREE.Mesh(new THREE.BoxGeometry(5.8, 4.2, 0.1), matPCB);
+            pcbGroup.add(pcb);
+            // Specialized ASIC/FPGA Chips
+            const asic = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.3), matDark);
+            asic.position.set(-1.5, 0.5, 0.15);
+            pcbGroup.add(asic);
+            const label = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.8), matGold);
+            label.position.set(-1.5, 0.5, 0.31); // Gold chip label
+            pcbGroup.add(label);
+            bodyGroup.add(pcbGroup);
+
+            // 8. Media Slots
+            const mediaSlots = new THREE.Group();
+            mediaSlots.position.set(2.8, 0, -1.0);
+            const cfastSlot = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 1.2), matDark);
+            cfastSlot.position.y = 0.5;
+            mediaSlots.add(cfastSlot);
+            const driveBay = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.5, 2.0), matDark);
+            driveBay.position.set(0.4, -0.5, 0);
+            mediaSlots.add(driveBay);
+            bodyGroup.add(mediaSlots);
+
+            // 9. Battery Plate & Power Distribution
+            const batteryPlate = new THREE.Group();
+            batteryPlate.position.set(0, 0, -2.4);
+            const vMount = new THREE.Mesh(new THREE.BoxGeometry(3.5, 4.5, 0.4), matDark);
+            batteryPlate.add(vMount);
+            // Gold Power Pins
+            for (let i = 0; i < 5; i++) {
+                const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.2), matGold);
+                pin.position.set(-0.8 + i * 0.4, 1.5, 0.2);
+                batteryPlate.add(pin);
+            }
+            bodyGroup.add(batteryPlate);
+
+            // 10. External Details (Handle/Buttons/EVF)
+            const handleGroup = new THREE.Group();
+            handleGroup.position.set(0, 2.75, 0);
+            const handleBase = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 3.0), matDark);
+            handleGroup.add(handleBase);
+            const dial1 = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 32), matDark);
+            dial1.position.set(2.0, -0.05, 1.0); // Mode Dial
+            handleGroup.add(dial1);
+            const btnRed = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16), matRed);
+            btnRed.position.set(2.5, -0.05, -1.0); // Shutter Button
+            handleGroup.add(btnRed);
+            bodyGroup.add(handleGroup);
+
+            // 10.5 Viewfinder (EVF)
+            const evfGroup = new THREE.Group();
+            evfGroup.position.set(-2.0, 3.2, -1.0);
+            const evfBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 1.8), matDark);
+            evfGroup.add(evfBody);
+            const eyepiece = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 32), matDark);
+            eyepiece.rotation.x = Math.PI / 2;
+            eyepiece.position.z = -1.0;
+            evfGroup.add(eyepiece);
+            bodyGroup.add(evfGroup);
+
+            // 11. Front Details (Tally & Release)
+            const frontDetails = new THREE.Group();
+            frontDetails.position.z = 2.0;
+            const tally = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), matTally);
+            tally.position.set(1.5, 2.0, 0.1);
+            frontDetails.add(tally);
+            const releaseBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.2, 16), matMetal);
+            releaseBtn.rotation.x = Math.PI / 2;
+            releaseBtn.position.set(2.5, -1.5, 0.1);
+            frontDetails.add(releaseBtn);
+            bodyGroup.add(frontDetails);
+
+            // 12. Mount Adapter
+            const adapterGeo = new THREE.CylinderGeometry(3.2, 3.2, 0.9, 64);
+            const adapter = new THREE.Mesh(adapterGeo, matMetal);
+            adapter.rotation.x = Math.PI / 2;
+            adapter.position.z = 2.45;
+            bodyGroup.add(adapter);
+
+            anatomyModel.add(bodyGroup);
+
+            // --- LENS SYSTEM ---
+            const lensGroup = new THREE.Group();
+            lensGroup.userData.type = 'lens';
+            lensGroup.position.z = 2.8; // Start after adapter
+
+            // 1. Outer Barrel
+            const barrelGeo = new THREE.CylinderGeometry(3.0, 3.0, 8.0, 64, 1, true);
+            const barrelMat = matBody.clone();
+            barrelMat.side = THREE.DoubleSide;
+            const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+            barrel.rotation.x = Math.PI / 2;
+            barrel.position.z = 4.0;
+            barrel.userData = { type: 'shell' };
+            lensGroup.add(barrel);
+
+            // 2. Control Rings (Focus/Zoom/Aperture)
+            const ring1 = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 1.5, 64), matDark);
+            ring1.rotation.x = Math.PI / 2;
+            ring1.position.z = 2.5; // Focus Ring
+            lensGroup.add(ring1);
+            const ringZoom = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 1.2, 64), matDark);
+            ringZoom.rotation.x = Math.PI / 2;
+            ringZoom.position.z = 4.5; // Zoom Ring
+            lensGroup.add(ringZoom);
+            const ring2 = new THREE.Mesh(new THREE.CylinderGeometry(3.1, 3.1, 1.0, 64), matDark);
+            ring2.rotation.x = Math.PI / 2;
+            ring2.position.z = 6.5; // Aperture Ring
+            lensGroup.add(ring2);
+
+            // 3. Lens Elements
+            const optics = [
+                { z: 0.5, r: 2.2, thick: 0.8, type: 'rear' },
+                { z: 2.0, r: 2.1, thick: 1.0, type: 'glass', group: 1 },
+                { z: 3.5, r: 2.0, thick: 0.8, type: 'focus', group: 1 },
+                { z: 5.0, r: 2.3, thick: 0.9, type: 'focus', group: 1 },
+                { z: 6.8, r: 2.6, thick: 1.2, type: 'front' },
+                { z: 7.8, r: 2.8, thick: 0.3, type: 'protector' }
+            ];
+
+            optics.forEach(opt => {
+                const grp = new THREE.Group();
+                grp.position.z = opt.z;
+
+                // Glass
+                const lensGeo = new THREE.SphereGeometry(opt.r, 48, 24);
+                const lens = new THREE.Mesh(lensGeo, matGlass);
+                lens.scale.z = 0.4;
+                grp.add(lens);
+
+                // Holder
+                const ringGeo = new THREE.TorusGeometry(opt.r, 0.15, 16, 48);
+                const ring = new THREE.Mesh(ringGeo, matMetal);
+                grp.add(ring);
+
+                grp.userData = { ...opt, baseZ: opt.z };
+                if (opt.type === 'focus') anatomyLensElements.push(grp);
+                lensGroup.add(grp);
+            });
+
+            anatomyModel.add(lensGroup);
+
+            // --- LIGHT RAYS ---
+            anatomyLightRays = new THREE.Group();
+            const rayMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6 });
+            for (let i = 0; i < 24; i++) {
+                const a = (i / 24) * Math.PI * 2;
+                const pts = [
+                    new THREE.Vector3(Math.cos(a) * 2.5, Math.sin(a) * 2.5, 18),
+                    new THREE.Vector3(Math.cos(a) * 1.8, Math.sin(a) * 1.8, 6),
+                    new THREE.Vector3(0, 0, 1.0)
+                ];
+                anatomyLightRays.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), rayMat));
+            }
+            anatomyLightRays.visible = false;
+            anatomyModel.add(anatomyLightRays);
+
+            anatomyScene.add(anatomyModel);
+        }
+
+        function setupAnatomyControls() {
+            // Close Modal
+            document.getElementById('btn-close-anatomy').onclick = () => {
+                document.getElementById('anatomy-modal').classList.add('hidden');
+                anatomyState.isOpen = false;
+            };
+
+            // Toggle Rotation
+            document.getElementById('btn-anatomy-rotate').onclick = () => {
+                anatomyState.isRotating = !anatomyState.isRotating;
+                document.getElementById('btn-anatomy-rotate').classList.toggle('text-indigo-400');
+            };
+
+            // Focus Slider
+            document.getElementById('anatomy-focus-slider').oninput = (e) => {
+                anatomyState.focusDistance = parseFloat(e.target.value);
+                document.getElementById('anatomy-focus-val').innerText = anatomyState.focusDistance.toFixed(1) + 'm';
+                updateInternalFocus();
+            };
+
+            // View Mode Buttons
+            const viewButtons = {
+                'btn-view-standard': 'standard',
+                'btn-view-xray': 'xray',
+                'btn-view-exploded': 'exploded'
+            };
+
+            Object.entries(viewButtons).forEach(([id, mode]) => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.onclick = () => {
+                    anatomyState.viewMode = mode;
+                    // Update UI
+                    document.querySelectorAll('.anatomy-view-btn').forEach(b => {
+                        b.classList.remove('active', 'bg-indigo-600', 'text-white');
+                        b.classList.add('bg-white/5', 'text-slate-400');
+                    });
+                    btn.classList.add('active', 'bg-indigo-600', 'text-white');
+                    btn.classList.remove('bg-white/5', 'text-slate-400');
+
+                    updateAnatomyMaterials();
+                };
+            });
+        }
+
+        // Global registration for the main button
+        function registerAnatomyButton() {
+            const btn = document.getElementById('btn-camera-anatomy');
+            if (btn) {
+                btn.onclick = () => {
+                    const modal = document.getElementById('anatomy-modal');
+                    modal.classList.remove('hidden');
+                    anatomyState.isOpen = true;
+
+                    // Initialize if first time
+                    initAnatomy();
+
+                    // Force resize after modal is visible to get correct dimensions
+                    setTimeout(handleAnatomyResize, 100);
+                };
+            }
+        }
+
+        function updateInternalFocus() {
+            // Simulate how internal elements move during focus
+            // Near focus = elements move forward
+            const moveAmt = (anatomyState.focusDistance - 5) * 0.1;
+            anatomyLensElements.forEach(el => {
+                if (el.userData.type === 'focus') {
+                    el.position.z = el.userData.baseZ + moveAmt;
+                }
+            });
+
+            // Update light rays convergence (visually)
+            anatomyLightRays.scale.set(1 + moveAmt * 0.5, 1 + moveAmt * 0.5, 1);
+        }
+
+        function updateAnatomyMaterials() {
+            const isXray = anatomyState.viewMode === 'xray';
+
+            anatomyModel.traverse(child => {
+                if (child.isMesh) {
+                    const mat = child.material;
+                    // Reset to default standard state first
+                    mat.wireframe = false;
+                    mat.transparent = mat.name === 'matGlass';
+                    mat.opacity = mat.name === 'matGlass' ? 0.4 : 1.0;
+                    mat.visible = true;
+
+                    if (isXray) {
+                        // SHELL & BODY -> Wireframe Ghost
+                        if (mat.name === 'matBody' || mat.name === 'matBodyGrip' || child.userData.type === 'shell') {
+                            mat.wireframe = true;
+                            mat.transparent = true;
+                            mat.opacity = mat.name === 'matBodyGrip' ? 0.4 : 0.05; // Make grip/wheels more visible
+                            mat.color.setHex(0x555555);
+                        }
+                        // INTERNAL MECH -> Visible Wireframe/Structure
+                        else if (mat.name === 'matRim' || mat.name === 'matMetal') {
+                            mat.wireframe = true;
+                            mat.transparent = true;
+                            mat.opacity = 0.5; // High visibility for target plate
+                            mat.color.setHex(0xaaaaaa);
+                        }
+                        // FILTERS -> Tinted Transparent
+                        else if (mat.name === 'matIR' || mat.name === 'matOLPF') {
+                            mat.wireframe = false;
+                            mat.transparent = true;
+                            mat.opacity = 0.4;
+                        }
+                        // CHIPS & GOLD & SCREEN & TALLY -> Glow
+                        else if (mat.name === 'matSensor' || mat.name === 'matPCB' || mat.name === 'matGold' || mat.name === 'matScreen' || mat.name === 'matTally' || mat.name === 'matRed') {
+                            mat.emissiveIntensity = 1.0;
+                            mat.wireframe = false;
+                            mat.opacity = 1.0;
+                            // Screen should stay bright
+                            if (mat.name === 'matScreen') {
+                                mat.color.setHex(0x00aaff);
+                                mat.emissive.setHex(0x00aaff);
+                                mat.emissiveIntensity = 0.8;
+                            }
+                            if (mat.name === 'matTally' || mat.name === 'matRed') {
+                                mat.emissive.setHex(0xff0000);
+                            }
+                        }
+                    } else {
+                        // Standard Material Restoration
+                        if (mat.name === 'matBody') {
+                            mat.color.setHex(0x222222);
+                            mat.opacity = 1.0;
+                        }
+                        if (mat.name === 'matRim' || mat.name === 'matMetal') {
+                            mat.color.setHex(0xaaaaaa);
+                            mat.wireframe = false;
+                            mat.opacity = 1.0;
+                        }
+                        if (mat.name === 'matGlass' || mat.name === 'matIR' || mat.name === 'matOLPF') {
+                            mat.opacity = mat.name === 'matGlass' ? 0.3 : (mat.name === 'matIR' ? 0.2 : 0.1);
+                            mat.emissiveIntensity = 0;
+                            mat.wireframe = false;
+                        }
+                        if (mat.name === 'matBodyGrip' || mat.name === 'matDark') {
+                            mat.opacity = 1.0;
+                            mat.color.setHex(0x111111);
+                        }
+                        if (mat.name === 'matScreen') {
+                            mat.color.setHex(0x000000);
+                            mat.emissive.setHex(0x222222);
+                        }
+                        if (mat.name === 'matGold') {
+                            mat.color.setHex(0xffd700);
+                        }
+                    }
+                }
+            });
+
+            // Toggle light rays
+            anatomyLightRays.visible = isXray;
+        }
+
+        function animateAnatomy() {
+            requestAnimationFrame(animateAnatomy);
+            if (!anatomyState.isOpen) return;
+
+            if (anatomyState.isRotating) {
+                anatomyModel.rotation.y += 0.005;
+            }
+
+            // Explode transition
+            const targetExplode = anatomyState.viewMode === 'exploded' ? 1 : 0;
+            anatomyState.explodeFactor += (targetExplode - anatomyState.explodeFactor) * 0.1;
+
+            anatomyModel.children.forEach(group => {
+                if (group.userData.type === 'lens') {
+                    group.position.z = 1.5 + anatomyState.explodeFactor * 5;
+                }
+            });
+
+            anatomyControls.update();
+            anatomyRenderer.render(anatomyScene, anatomyCamera);
+        }
+
+        function handleAnatomyResize() {
+            if (!anatomyCamera || !anatomyRenderer) return;
+            const container = document.getElementById('anatomy-canvas-container');
+            anatomyCamera.aspect = container.clientWidth / container.clientHeight;
+            anatomyCamera.updateProjectionMatrix();
+            anatomyRenderer.setSize(container.clientWidth, container.clientHeight);
+        }
+        window.addEventListener('resize', handleAnatomyResize);
+
+        // ═══════════════════════════════════════════════════════════════
+        // START APPLICATION
+        // ═══════════════════════════════════════════════════════════════
+        // Global registration
+        registerAnatomyButton();
+        window.onload = init;
+
+    </script>
+    <!-- Camera Anatomy Modal -->
+    <div id="anatomy-modal" class="hidden fixed inset-0 bg-slate-950 z-[200] flex flex-col">
+        <!-- Header -->
+        <div
+            class="p-6 bg-[#0a0a0a] border-b border-white/5 flex justify-between items-center shadow-[0_10px_40px_rgba(0,0,0,0.8)]">
+            <div class="flex items-center gap-5">
+                <div
+                    class="w-12 h-12 bg-white flex items-center justify-center text-2xl font-black text-black rounded-sm shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                    Z</div>
+                <div>
+                    <h2 class="text-white font-black text-2xl uppercase tracking-[0.3em] leading-none">CAMERA<span
+                            class="text-red-600">Z</span> ANATOMY</h2>
+                    <p class="text-slate-500 text-[9px] font-bold uppercase tracking-[0.2em] mt-1">Advanced Lens &
+                        Sensor Architecture Simulation</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <!-- Suggestion: Auto-Rotate -->
+                <button id="btn-anatomy-rotate"
+                    class="text-slate-400 hover:text-white transition-all p-2 rounded-lg hover:bg-white/5"
+                    title="Auto Rotate">
+                    <span class="text-xl">🔄</span>
+                </button>
+                <button id="btn-close-anatomy"
+                    class="bg-red-600/20 hover:bg-red-600 text-red-500 hover:text-white w-10 h-10 rounded-xl flex items-center justify-center transition-all border border-red-500/30 font-black">✕</button>
+            </div>
+        </div>
+
+        <div class="flex-1 relative flex">
+            <!-- Sidebar Controls -->
+            <div
+                class="w-80 bg-slate-900/50 backdrop-blur-xl border-r border-white/5 p-6 flex flex-col gap-8 overflow-y-auto">
+                <!-- View Modes -->
+                <div class="space-y-4">
+                    <h3
+                        class="text-indigo-400 text-[10px] font-black uppercase tracking-widest border-b border-indigo-500/30 pb-2">
+                        View Modes</h3>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button id="btn-view-standard"
+                            class="anatomy-view-btn active bg-indigo-600 text-white p-3 rounded-lg text-[11px] font-bold text-left flex justify-between items-center transition-all">
+                            STANDARD VIEW <span>BOX</span>
+                        </button>
+                        <button id="btn-view-exploded"
+                            class="anatomy-view-btn bg-white/5 text-slate-400 hover:bg-white/10 p-3 rounded-lg text-[11px] font-bold text-left flex justify-between items-center transition-all">
+                            EXPLODED VIEW <span>EXPAND</span>
+                        </button>
+                        <button id="btn-view-xray"
+                            class="anatomy-view-btn bg-white/5 text-slate-400 hover:bg-white/10 p-3 rounded-lg text-[11px] font-bold text-left flex justify-between items-center transition-all">
+                            X-RAY VIEW <span>RADAR</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Focus Simulation -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center border-b border-white/5 pb-2">
+                        <h3 class="text-indigo-400 text-[10px] font-black uppercase tracking-widest">Internal Focus</h3>
+                        <span id="anatomy-focus-val" class="text-white text-[10px] font-mono">5.0m</span>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="relative pt-1">
+                            <input type="range" id="anatomy-focus-slider" min="0.8" max="22" step="0.1" value="5"
+                                class="w-full accent-indigo-500 bg-slate-800 h-1.5 rounded-full appearance-none cursor-pointer">
+                        </div>
+                        <p class="text-[10px] text-slate-500 leading-relaxed italic">Observe how the internal lens
+                            groups move to converge light on the CMOS sensor.</p>
+                    </div>
+                </div>
+
+                <!-- Component Info (Dynamic) -->
+                <div id="anatomy-component-info" class="flex-1 space-y-4">
+                    <h3
+                        class="text-indigo-400 text-[10px] font-black uppercase tracking-widest border-b border-white/5 pb-2">
+                        Component Specs</h3>
+                    <div class="p-4 bg-white/5 rounded-xl space-y-3">
+                        <div class="flex justify-between">
+                            <span class="text-[9px] text-slate-500">FORMAT</span>
+                            <span class="text-[9px] text-white font-bold">SUPER 35</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-[9px] text-slate-500">MOUNTS</span>
+                            <span class="text-[9px] text-white font-bold">LPL / PL</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-[9px] text-slate-500">OPTICS</span>
+                            <span class="text-[9px] text-white font-bold">14 ELEMENTS / 9 GROUPS</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="p-4 bg-indigo-600/10 rounded-xl border border-indigo-500/20">
+                    <div class="flex gap-2 items-center mb-2">
+                        <div class="w-3 h-[2px] bg-red-500"></div>
+                        <span class="text-[9px] font-black text-red-400 uppercase">Light Path Path</span>
+                    </div>
+                    <p class="text-[9px] text-indigo-300/70 leading-normal">
+                        Internal groups move precisely to maintain focus distance across the focal range.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 3D Canvas Container -->
+            <div id="anatomy-canvas-container"
+                class="flex-1 bg-gradient-to-b from-slate-950 to-slate-900 cursor-grab active:cursor-grabbing"></div>
+
+            <!-- Bottom Specs (Suggestion) -->
+            <div
+                class="absolute bottom-6 right-6 p-4 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 flex flex-col gap-1 items-end">
+                <span class="text-white font-black text-xs uppercase tracking-widest">ARRI ALEXA 35 Simulation</span>
+                <span class="text-indigo-400 text-[10px] font-bold">PHYSICAL OPTICS ENGINE v2.0 ACTIVE</span>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .anatomy-view-btn.active {
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+        }
+    </style>
+</body>
+
+</html>
