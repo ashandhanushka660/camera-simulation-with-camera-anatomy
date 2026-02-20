@@ -239,6 +239,41 @@
             user-select: none;
         }
 
+        /* Draggable panel styles */
+        .panel-drag-handle {
+            cursor: move;
+            user-select: none;
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 16px 16px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-drag-handle .drag-dots {
+            display: flex;
+            gap: 3px;
+            flex-wrap: wrap;
+            width: 20px;
+        }
+
+        .panel-drag-handle .drag-dots span {
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+        }
+
+        .panel-drag-handle .drag-title {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            font-weight: 900;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
         #panel-resizer {
             width: 6px;
             height: 100%;
@@ -522,15 +557,84 @@
                 <span id="tc">00:00:00:00</span>
             </div>
 
-            <!-- Bottom Center: Focus Bar -->
-            <div class="absolute bottom-14 left-1/2 -translate-x-1/2 w-80 flex flex-col items-center">
-                <div class="w-full h-1 bg-black/30 relative rounded">
+            <!-- Bottom Center: DOF Trinity Visualization -->
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center z-50"
+                style="width:520px; max-width:90vw;">
+                <!-- Focus Distance Bar with Zone of Acceptable Sharpness -->
+                <div class="w-full relative" style="height:28px;">
+                    <!-- Scale Background -->
+                    <div class="w-full h-2 bg-black/30 relative rounded-full" style="top:10px;">
+                        <!-- Zone of Acceptable Sharpness (green band) -->
+                        <div id="dof-zone" class="absolute h-full rounded-full transition-all duration-300"
+                            style="background: linear-gradient(90deg, transparent, rgba(34,197,94,0.5), rgba(34,197,94,0.7), rgba(34,197,94,0.5), transparent); left:40%; width:20%;">
+                        </div>
+                        <!-- Near Focus Limit marker -->
+                        <div id="dof-near-marker"
+                            class="absolute -top-1.5 w-0.5 h-5 bg-green-400 transition-all duration-300"
+                            style="left:40%;">
+                            <span
+                                class="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] text-green-400 font-bold whitespace-nowrap"
+                                id="dof-near-label">3.2m</span>
+                        </div>
+                        <!-- Far Focus Limit marker -->
+                        <div id="dof-far-marker"
+                            class="absolute -top-1.5 w-0.5 h-5 bg-green-400 transition-all duration-300"
+                            style="left:60%;">
+                            <span
+                                class="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] text-green-400 font-bold whitespace-nowrap"
+                                id="dof-far-label">7.8m</span>
+                        </div>
+                    </div>
+                    <!-- Focus Point (red pointer) -->
                     <div id="focus-ptr"
-                        class="absolute -top-1.5 w-3 h-5 bg-red-600 transition-all duration-150 shadow-lg"
-                        style="left:50%"></div>
+                        class="absolute w-3 h-7 bg-red-600 transition-all duration-150 shadow-lg rounded-sm"
+                        style="left:50%; top:3px;"></div>
                 </div>
-                <div class="mt-3 text-xs digital-text tracking-wider text-black font-bold">
-                    FOCUS: <span id="dist-label">5.0</span>m | DoF: <span id="dof-label">0.8</span>m
+
+                <!-- Distance scale labels -->
+                <div class="w-full flex justify-between text-[7px] text-black/50 font-bold mt-1 px-1">
+                    <span>0.5m</span><span>2m</span><span>5m</span><span>10m</span><span>25m</span><span>50m</span><span>∞</span>
+                </div>
+
+                <!-- DOF Info Row -->
+                <div
+                    class="w-full flex items-center justify-between mt-1 bg-black/60 backdrop-blur-md rounded-lg px-3 py-1.5 border border-white/10">
+                    <!-- Focus Distance -->
+                    <div class="flex flex-col items-center">
+                        <span class="text-[7px] text-white/50 uppercase tracking-wider font-bold">Focus</span>
+                        <span class="text-xs text-white font-black digital-text"><span
+                                id="dist-label">5.0</span>m</span>
+                    </div>
+                    <div class="w-px h-6 bg-white/20"></div>
+                    <!-- DoF Range -->
+                    <div class="flex flex-col items-center">
+                        <span class="text-[7px] text-green-400/80 uppercase tracking-wider font-bold">DoF Range</span>
+                        <span class="text-xs text-green-400 font-black digital-text"><span
+                                id="dof-label">0.8</span>m</span>
+                    </div>
+                    <div class="w-px h-6 bg-white/20"></div>
+                    <!-- Circle of Confusion -->
+                    <div class="flex flex-col items-center">
+                        <span class="text-[7px] text-yellow-400/80 uppercase tracking-wider font-bold">CoC</span>
+                        <span class="text-xs text-yellow-400 font-black digital-text"><span
+                                id="coc-label">0.030</span>mm</span>
+                    </div>
+                    <div class="w-px h-6 bg-white/20"></div>
+                    <!-- Trinity Factors -->
+                    <div class="flex flex-col items-center">
+                        <span class="text-[7px] text-blue-400/80 uppercase tracking-wider font-bold">Aperture</span>
+                        <span class="text-[10px] text-blue-400 font-black digital-text"
+                            id="dof-aperture-val">f/4.0</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <span class="text-[7px] text-purple-400/80 uppercase tracking-wider font-bold">Focal</span>
+                        <span class="text-[10px] text-purple-400 font-black digital-text" id="dof-focal-val">50mm</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <span class="text-[7px] text-orange-400/80 uppercase tracking-wider font-bold">Subject</span>
+                        <span class="text-[10px] text-orange-400 font-black digital-text"
+                            id="dof-subject-val">5.0m</span>
+                    </div>
                 </div>
             </div>
 
@@ -560,7 +664,7 @@
         </div>
 
         <!-- Control Panel -->
-        <div class="absolute right-6 top-1/2 -translate-y-1/2 space-y-6 z-50">
+        <div id="control-panel-wrapper" class="absolute right-6 top-1/2 -translate-y-1/2 space-y-6 z-50">
             <button id="btn-mode"
                 class="bg-blue-600 text-white font-black py-4 px-10 rounded-xl text-sm shadow-2xl hover:scale-105 active:scale-95 transition-all uppercase tracking-wider border-b-4 border-blue-800">
                 Enter Cameraman Mode
@@ -573,6 +677,18 @@
 
             <div id="focus-controls"
                 class="hidden flex flex-col items-center space-y-6 bg-white/70 p-6 rounded-2xl backdrop-blur-xl border border-white/40 shadow-2xl max-h-[85vh] overflow-y-auto interactive-area">
+
+                <!-- Draggable Handle -->
+                <div id="panel-drag-handle" class="panel-drag-handle w-full -mt-6 -mx-6"
+                    style="margin-top:-24px; margin-left:-24px; margin-right:-24px; width:calc(100% + 48px);">
+                    <div class="drag-dots">
+                        <span></span><span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <span class="drag-title">⋮⋮ Drag to Move</span>
+                    <div class="drag-dots">
+                        <span></span><span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
 
                 <!-- Panel Resizer Handle -->
                 <div id="panel-resizer"></div>
@@ -885,7 +1001,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div><!-- end control-panel-wrapper -->
 
         <!-- Advanced Settings Modal -->
         <div id="settings-modal"
@@ -1738,6 +1854,70 @@
             });
 
             setupPanelResizing();
+            setupPanelDragging();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PROBLEM 5: DRAGGABLE PANEL
+        // ═══════════════════════════════════════════════════════════════
+        function setupPanelDragging() {
+            const wrapper = document.getElementById('control-panel-wrapper');
+            const handle = document.getElementById('panel-drag-handle');
+            if (!wrapper || !handle) return;
+
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+
+            const onDown = (e) => {
+                if (e.target.closest('button, input, select')) return;
+                isDragging = true;
+
+                // Get current position
+                const rect = wrapper.getBoundingClientRect();
+
+                // Prepare for fixed positioning
+                wrapper.style.position = 'fixed';
+                wrapper.style.right = 'auto';
+                wrapper.style.bottom = 'auto';
+                wrapper.style.margin = '0';
+                wrapper.style.left = rect.left + 'px';
+                wrapper.style.top = rect.top + 'px';
+                wrapper.style.transform = 'none';
+                wrapper.classList.remove('-translate-y-1/2');
+
+                startX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+                startY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                startLeft = rect.left;
+                startTop = rect.top;
+
+                if (e.type === 'mousedown') e.preventDefault();
+                e.stopPropagation();
+            };
+
+            const onMove = (e) => {
+                if (!isDragging) return;
+                const x = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+                const y = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                const dx = x - startX;
+                const dy = y - startY;
+
+                const newLeft = Math.max(0, Math.min(window.innerWidth - 80, startLeft + dx));
+                const newTop = Math.max(0, Math.min(window.innerHeight - 80, startTop + dy));
+
+                wrapper.style.left = newLeft + 'px';
+                wrapper.style.top = newTop + 'px';
+            };
+
+            const onUp = () => {
+                isDragging = false;
+            };
+
+            handle.addEventListener('mousedown', onDown);
+            handle.addEventListener('touchstart', onDown, { passive: false });
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove, { passive: false });
+            window.addEventListener('mouseup', onUp);
+            window.addEventListener('touchend', onUp);
         }
 
         function setupPanelResizing() {
@@ -1856,51 +2036,59 @@
 
         function setupFollowFocusWheel() {
             let wheelDragging = false;
-            let startAngle = 0;
-            let lastFocusDist = 0;
+            let lastAngle = 0;
 
-            const onWheelDown = (e) => {
-                wheelDragging = true;
-                const rect = elements.wheel.getBoundingClientRect();
+            const getAngle = (e, rect) => {
                 const cx = rect.left + rect.width / 2;
                 const cy = rect.top + rect.height / 2;
                 const clientX = e.clientX ?? e.touches?.[0].clientX;
                 const clientY = e.clientY ?? e.touches?.[0].clientY;
-                startAngle = Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI);
-                lastFocusDist = state.focusDist;
+                return Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI);
+            };
+
+            const onWheelDown = (e) => {
+                wheelDragging = true;
+                elements.wheel.style.cursor = 'grabbing';
+                const rect = elements.wheel.getBoundingClientRect();
+                lastAngle = getAngle(e, rect);
                 e.preventDefault();
+                e.stopPropagation();
             };
 
             const onWheelMove = (e) => {
                 if (!wheelDragging) return;
                 e.preventDefault();
+                e.stopPropagation();
                 const rect = elements.wheel.getBoundingClientRect();
-                const cx = rect.left + rect.width / 2;
-                const cy = rect.top + rect.height / 2;
-                const clientX = e.clientX ?? e.touches?.[0].clientX;
-                const clientY = e.clientY ?? e.touches?.[0].clientY;
-                const currentAngle = Math.atan2(clientY - cy, clientX - cx) * (180 / Math.PI);
+                const currentAngle = getAngle(e, rect);
 
-                let diff = currentAngle - startAngle;
+                let diff = currentAngle - lastAngle;
+                // Handle wraparound at -180/180 boundary
                 if (diff > 180) diff -= 360;
                 if (diff < -180) diff += 360;
 
-                // Rotate the UI mark
-                state.wheelAngle += diff;
+                // Accumulate wheel rotation for visual feedback
+                state.wheelAngle = (state.wheelAngle || 0) + diff;
                 elements.wheelMark.style.transform = `translateX(-50%) rotate(${state.wheelAngle}deg)`;
 
-                // Update focus distance: 360 degrees = 5m change
-                const focusDelta = (diff / 360) * 10;
-                state.focusDist = Math.max(0.5, Math.min(100, state.focusDist + focusDelta));
+                // Update focus distance: 360° rotation = full range (0.5m to 100m)
+                // Using logarithmic mapping for natural feel
+                const focusDelta = (diff / 360) * 20;
+                const newFocus = Math.max(0.5, Math.min(100, state.focusDist + focusDelta));
+                state.focusDist = newFocus;
 
-                startAngle = currentAngle; // Update for next move
+                lastAngle = currentAngle;
 
                 state.afMode = 'manual';
                 updateFocusSystemUI();
                 updateFocusDisplay();
+                updateCamera();
             };
 
-            const onWheelUp = () => wheelDragging = false;
+            const onWheelUp = () => {
+                wheelDragging = false;
+                elements.wheel.style.cursor = 'grab';
+            };
 
             elements.wheel.addEventListener('mousedown', onWheelDown);
             elements.wheel.addEventListener('touchstart', onWheelDown, { passive: false });
@@ -2212,6 +2400,14 @@
                 actor.mesh.position.x += dx;
                 actor.mesh.position.z += dz;
                 actor.pos.copy(actor.mesh.position).y = 1.6;
+
+                // AUTO-TRACK: Update focus distance to follow the actor
+                // This prevents unwanted blur when demonstrating DOF Trinity
+                if (state.afMode !== 'manual') {
+                    const dist = camera.position.distanceTo(actor.pos);
+                    state.focusDist = Math.max(0.5, Math.min(100, dist));
+                    updateFocusDisplay();
+                }
             }
         }
 
@@ -2304,33 +2500,55 @@
                 applyAspectRatio(state.aspectRatio);
             };
 
-            // Depth of Field Presets
+            // Depth of Field Presets - DOF TRINITY DEMONSTRATION
             elements.btnShallow.onclick = () => {
-                // Real camera logic: Wide aperture + slightly longer lens for compressed shallow effect
+                // SHALLOW DOF: Wide aperture (f/1.8) + Telephoto (85mm) = very shallow
+                // Also raise ISO to compensate for the brighter aperture
                 animateValue(state.aperture, 1.8, 800, (v) => {
                     state.aperture = v;
                     elements.inputFstop.value = v;
                     elements.fstopVal.textContent = `f/${v.toFixed(1)}`;
                     updateFocusDisplay();
                 });
-                // If zoom is too wide, punch in a bit for better shallow effect
-                if (state.zoom < 50) {
-                    animateValue(state.zoom, 85, 1000, (v) => {
-                        state.zoom = v;
-                        elements.inputZoom.value = v;
-                        elements.zoomVal.textContent = `${Math.round(v)}mm`;
-                        updateCamera();
-                    });
-                }
+                // Telephoto compresses and isolates subject with shallow DOF
+                animateValue(state.zoom, 85, 1000, (v) => {
+                    state.zoom = Math.round(v);
+                    elements.inputZoom.value = state.zoom;
+                    elements.zoomVal.textContent = `${state.zoom}mm`;
+                    updateFocusDisplay();
+                    if (viewMode === '1stPerson') updateCamera();
+                });
+                // Lower ISO to compensate for wide aperture letting in more light
+                animateValue(state.iso, 100, 600, (v) => {
+                    state.iso = Math.round(v);
+                    elements.inputIso.value = state.iso;
+                    elements.isoVal.textContent = state.iso;
+                    document.getElementById('iso-val').textContent = state.iso;
+                });
             };
 
             elements.btnDeep.onclick = () => {
-                // Real camera logic: Small aperture for deep focus
+                // DEEP DOF: Narrow aperture (f/11) + Wide angle (24mm) = very deep
                 animateValue(state.aperture, 11.0, 800, (v) => {
                     state.aperture = v;
                     elements.inputFstop.value = v;
                     elements.fstopVal.textContent = `f/${v.toFixed(1)}`;
                     updateFocusDisplay();
+                });
+                // Wide angle gives naturally deeper DOF
+                animateValue(state.zoom, 24, 1000, (v) => {
+                    state.zoom = Math.round(v);
+                    elements.inputZoom.value = state.zoom;
+                    elements.zoomVal.textContent = `${state.zoom}mm`;
+                    updateFocusDisplay();
+                    if (viewMode === '1stPerson') updateCamera();
+                });
+                // Raise ISO to compensate for narrow aperture letting in less light
+                animateValue(state.iso, 800, 600, (v) => {
+                    state.iso = Math.round(v);
+                    elements.inputIso.value = state.iso;
+                    elements.isoVal.textContent = state.iso;
+                    document.getElementById('iso-val').textContent = state.iso;
                 });
             };
 
@@ -2710,30 +2928,106 @@
                 elements.distLabel.textContent = state.focusDist.toFixed(1);
             }
 
-            // Fix pointer range: 0.5m to 100m scale.
-            const percentage = Math.max(0, Math.min(100, (state.focusDist - 0.5) / 99.5 * 100));
+            // Logarithmic scale mapping for distance bar (0.5m to 100m)
+            function distToPercent(d) {
+                const minD = 0.5, maxD = 100;
+                d = Math.max(minD, Math.min(maxD, d));
+                return ((Math.log(d) - Math.log(minD)) / (Math.log(maxD) - Math.log(minD))) * 100;
+            }
+
+            // Focus pointer position
+            const percentage = distToPercent(state.focusDist);
             elements.focusPtr.style.left = `${percentage}%`;
 
-            // Calculate depth of field
-            const dof = calculateDoF(state.focusDist, state.aperture, state.zoom);
-            elements.dofLabel.textContent = dof.toFixed(1);
+            // Calculate depth of field with near/far limits
+            const dofResult = calculateDoFDetailed(state.focusDist, state.aperture, state.zoom);
+            elements.dofLabel.textContent = dofResult.dof.toFixed(1);
+
+            // Update Zone of Acceptable Sharpness (green band)
+            const nearPct = distToPercent(dofResult.nearLimit);
+            const farPct = distToPercent(Math.min(dofResult.farLimit, 100));
+            const zoneWidth = farPct - nearPct;
+
+            const dofZone = document.getElementById('dof-zone');
+            const dofNearMarker = document.getElementById('dof-near-marker');
+            const dofFarMarker = document.getElementById('dof-far-marker');
+            const dofNearLabel = document.getElementById('dof-near-label');
+            const dofFarLabel = document.getElementById('dof-far-label');
+
+            if (dofZone) {
+                dofZone.style.left = `${nearPct}%`;
+                dofZone.style.width = `${Math.max(1, zoneWidth)}%`;
+            }
+            if (dofNearMarker) {
+                dofNearMarker.style.left = `${nearPct}%`;
+            }
+            if (dofFarMarker) {
+                dofFarMarker.style.left = `${farPct}%`;
+            }
+            if (dofNearLabel) {
+                dofNearLabel.textContent = dofResult.nearLimit.toFixed(1) + 'm';
+            }
+            if (dofFarLabel) {
+                dofFarLabel.textContent = dofResult.farLimit > 99 ? '∞' : dofResult.farLimit.toFixed(1) + 'm';
+            }
+
+            // Update Circle of Confusion display
+            const cocLabel = document.getElementById('coc-label');
+            if (cocLabel) {
+                // Actual CoC based on focus error at subject distance
+                const currentActor = subjects[state.selectedActorIndex];
+                let actualCoC = 0.030; // Default max CoC (full frame)
+                if (currentActor) {
+                    const realDist = camera.position.distanceTo(currentActor.pos);
+                    const focusError = Math.abs(realDist - state.focusDist);
+                    // CoC increases with focus error, scaled by aperture
+                    actualCoC = Math.min(0.200, 0.030 * focusError * (4.0 / state.aperture));
+                    if (focusError < 0.1) actualCoC = 0.001; // Perfect focus
+                }
+                cocLabel.textContent = actualCoC.toFixed(3);
+            }
+
+            // Update DOF Trinity factor labels
+            const dofApertureVal = document.getElementById('dof-aperture-val');
+            const dofFocalVal = document.getElementById('dof-focal-val');
+            const dofSubjectVal = document.getElementById('dof-subject-val');
+
+            if (dofApertureVal) dofApertureVal.textContent = `f/${state.aperture.toFixed(1)}`;
+            if (dofFocalVal) dofFocalVal.textContent = `${state.zoom}mm`;
+            if (dofSubjectVal) dofSubjectVal.textContent = state.focusDist > 98 ? '∞' : `${state.focusDist.toFixed(1)}m`;
         }
 
         function calculateDoF(distance, aperture, focalLength) {
-            const coc = 0.03; // mm
+            const result = calculateDoFDetailed(distance, aperture, focalLength);
+            return result.dof;
+        }
+
+        function calculateDoFDetailed(distance, aperture, focalLength) {
+            const coc = 0.03; // mm (full frame circle of confusion)
             const distMm = distance * 1000;
-            const H = (focalLength * focalLength) / (aperture * coc) + focalLength;
+            const H = (focalLength * focalLength) / (aperture * coc) + focalLength; // Hyperfocal distance
 
             const nearLimit = (H * distMm) / (H + (distMm - focalLength));
             let farLimit = (H * distMm) / (H - (distMm - focalLength));
 
             // If denominator is negative or zero, far limit is infinity
+            let isInfinity = false;
             if (H <= (distMm - focalLength)) {
                 farLimit = distMm * 1000; // Large number for infinity logic
+                isInfinity = true;
             }
 
-            const dofRange = (farLimit - nearLimit) / 1000;
-            return Math.min(dofRange, 99.9);
+            const nearM = nearLimit / 1000;
+            const farM = farLimit / 1000;
+            const dofRange = Math.min(farM - nearM, 99.9);
+
+            return {
+                nearLimit: Math.max(0.1, nearM),
+                farLimit: isInfinity ? 999 : Math.max(nearM + 0.01, farM),
+                dof: dofRange,
+                hyperfocal: H / 1000,
+                isInfinity: isInfinity
+            };
         }
 
         function animateValue(start, end, duration, onUpdate) {
@@ -2903,19 +3197,37 @@
             const realDist = camera.position.distanceTo(currentActor.pos);
             const focusError = Math.abs(realDist - state.focusDist);
 
-            // Calculate blur amount based on aperture and focus error
-            const blurIntensity = focusError * (20 / state.aperture) * (state.aperture < 4 ? 1.8 : 1.2);
-            const blurPx = Math.min(blurIntensity, 35);
+            // ═══════════════════════════════════════════════════════════
+            // DOF TRINITY BLUR CALCULATION
+            // Blur depends on ALL THREE factors:
+            // 1. Aperture (wider = more blur)
+            // 2. Focal Length (longer = more blur)  
+            // 3. Subject Distance (closer = more blur)
+            // ═══════════════════════════════════════════════════════════
+            const focalFactor = state.zoom / 50; // Normalize around 50mm
+            const apertureFactor = 20 / state.aperture; // Wider aperture = more blur
+            const distanceFactor = state.aperture < 4 ? 1.8 : 1.2;
+            const blurIntensity = focusError * apertureFactor * focalFactor * distanceFactor;
+            const blurPx = Math.min(blurIntensity, 40);
+
+            // ═══════════════════════════════════════════════════════════
+            // PROBLEM 6: APERTURE BRIGHTNESS - Real Camera Physics
+            // Aperture area is proportional to 1/(f-stop^2)
+            // f/1.4 lets in ~256x more light than f/22
+            // We normalize around f/4.0 as our baseline (1.0x brightness)
+            // ═══════════════════════════════════════════════════════════
+            const baselineAperture = 4.0;
+            // Light throughput ratio: (baseline/current)^2
+            const apertureBrightness = Math.pow(baselineAperture / state.aperture, 2);
+            // Clamp to reasonable range (0.04x at f/22 to 5.2x at f/1.4)
+            const clampedApertureBrightness = Math.max(0.15, Math.min(4.0, apertureBrightness));
 
             // Adjust brightness based on ISO (using actual ISO value from state)
-            const actualISO = state.iso; // Use the actual ISO from state
-            // Map ISO 0-256000 to brightness multiplier: ISO 0 = very dark (0.1x), ISO 100 = normal (1.0x), ISO 256000 = very bright (5.0x)
+            const actualISO = state.iso;
             let isoBrightness;
             if (actualISO <= 100) {
-                // 0-100: scale from 0.4 to 1.0 (Less dark)
                 isoBrightness = 0.4 + (actualISO / 100) * 0.6;
             } else {
-                // 100-256000: scale from 1.0 to 6.0
                 isoBrightness = 1.0 + ((actualISO - 100) / 255900) * 5.0;
             }
 
@@ -2952,8 +3264,8 @@
                 renderer.domElement.style.transform = 'scaleX(1)';
             }
 
-            // Combine all effects
-            const finalBrightness = isoBrightness * shutterBrightness;
+            // Combine all effects - PROBLEM 6: Include aperture in brightness
+            const finalBrightness = isoBrightness * shutterBrightness * clampedApertureBrightness;
             const filters = [
                 `blur(${blurPx}px)`,
                 `brightness(${finalBrightness})`,
@@ -2992,13 +3304,15 @@
             viewMode: 'standard',
             isRotating: true,
             focusDistance: 5.0,
-            explodeFactor: 0
+            explodeFactor: 0,
+            apertureValue: 4.0  // f-stop value for iris (Problem 1)
         };
 
         let anatomyScene, anatomyCamera, anatomyRenderer, anatomyControls;
         let anatomyModel = new THREE.Group();
         let anatomyLensElements = [];
         let anatomyLightRays = new THREE.Group();
+        let anatomyIrisBlades = []; // Problem 1: iris blade meshes
 
         function initAnatomy() {
             const container = document.getElementById('anatomy-canvas-container');
@@ -3019,6 +3333,13 @@
             anatomyControls = new THREE.OrbitControls(anatomyCamera, anatomyRenderer.domElement);
             anatomyControls.enableDamping = true;
             anatomyControls.dampingFactor = 0.05;
+
+            // DOUBLE-CLICK to pause/resume rotation
+            anatomyRenderer.domElement.addEventListener('dblclick', () => {
+                anatomyState.isRotating = !anatomyState.isRotating;
+                const rotateBtn = document.getElementById('btn-anatomy-rotate');
+                if (rotateBtn) rotateBtn.classList.toggle('text-indigo-400');
+            });
 
             // Lighting
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -3161,47 +3482,27 @@
             const bodyGroup = new THREE.Group();
             bodyGroup.userData.type = 'body';
 
-            // 1. Main Chassis - Larger Cube
-            const bodyGeo = new THREE.BoxGeometry(6.5, 5.0, 4.0);
+            // 1. Main Chassis - Enlarged to fit barrel properly
+            const bodyGeo = new THREE.BoxGeometry(8.0, 6.5, 5.0);
             const bodyMain = new THREE.Mesh(bodyGeo, matBody);
             bodyGroup.add(bodyMain);
 
             // 2. Rear LCD Panel (Back of Camera, facing -Z)
-            const lcdGroup = new THREE.Group();
-            lcdGroup.position.set(0, 0, -2.01); // Flush with back face
-            // Monitor Frame
-            const lcdBezel = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.0, 0.2), matDark);
-            lcdBezel.position.z = -0.1;
-            lcdGroup.add(lcdBezel);
-            // Screen (Facing -Z)
-            const matScreenData = matScreen.clone();
-            matScreenData.emissiveMap = createProceduralTexture('sensor');
-            const lcdScreen = new THREE.Mesh(new THREE.PlaneGeometry(3.8, 2.6), matScreenData);
-            lcdScreen.rotation.y = Math.PI; // Face backwards towards user
-            lcdScreen.position.z = -0.211;
-            lcdGroup.add(lcdScreen);
-            bodyGroup.add(lcdGroup);
+            // Rear panel is now handled by the DSLR back panel section below
 
-            // 3. Side Controls & I/O (Right & Left)
+            // 3. Side Controls & I/O (Right side)
             const sideControls = new THREE.Group();
-            sideControls.position.set(3.26, 0, 0); // Right side
+            sideControls.position.set(4.01, 0, 0); // Right side flush with larger body
             // Jog Wheel
             const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.4, 32), matDark);
             wheel.rotation.z = Math.PI / 2;
             wheel.position.set(0.2, -1.0, 0);
             sideControls.add(wheel);
-            // Navigation Buttons (D-Pad)
-            for (let i = 0; i < 4; i++) {
-                const angle = (i / 4) * Math.PI * 2;
-                const b = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.3), matDark);
-                b.position.set(0.1, -1.0 + Math.sin(angle) * 0.5, Math.cos(angle) * 0.5);
-                sideControls.add(b);
-            }
             bodyGroup.add(sideControls);
 
             // 3.5 I/O Ports (Left Side)
             const ioGroup = new THREE.Group();
-            ioGroup.position.set(-3.26, 0, 0);
+            ioGroup.position.set(-4.01, 0, 0);
             const portGeo = new THREE.BoxGeometry(0.1, 0.4, 0.6);
             for (let i = 0; i < 3; i++) {
                 const p = new THREE.Mesh(portGeo, matDark);
@@ -3213,29 +3514,29 @@
             // 3.6 Rubberized Grip
             const gripMat = matDark.clone();
             gripMat.roughness = 1.0;
-            const grip = new THREE.Mesh(new THREE.BoxGeometry(1.0, 4.0, 3.0), gripMat);
-            grip.position.set(-3.0, 0, 0.5);
+            const grip = new THREE.Mesh(new THREE.BoxGeometry(1.2, 5.5, 4.0), gripMat);
+            grip.position.set(-3.6, 0, 0.5);
             bodyGroup.add(grip);
 
             // 4. Gold Plating & Outlines
             const plating = new THREE.Group();
             // Gold strips on corners
-            const goldStripGeo = new THREE.BoxGeometry(0.1, 5.1, 0.2);
+            const goldStripGeo = new THREE.BoxGeometry(0.1, 6.6, 0.2);
             for (let i = 0; i < 2; i++) {
                 const s = new THREE.Mesh(goldStripGeo, matGold);
-                s.position.set(3.26 * (i === 0 ? 1 : -1), 0, 2.0);
+                s.position.set(4.01 * (i === 0 ? 1 : -1), 0, 2.5);
                 plating.add(s);
             }
             // Black outline rings for lens
             const outlineRing = new THREE.Mesh(new THREE.TorusGeometry(3.05, 0.05, 16, 64), matDark);
             outlineRing.rotation.x = Math.PI / 2;
-            outlineRing.position.z = 2.45; // Over the adapter
+            outlineRing.position.z = 2.95; // Over the adapter
             bodyGroup.add(outlineRing);
             bodyGroup.add(plating);
 
             // 5. Sensor & Optical Filters (Heart of the Box)
             const sensorGroup = new THREE.Group();
-            sensorGroup.position.z = 1.0;
+            sensorGroup.position.z = 1.5;
             // Sensor Frame
             const sFrame = new THREE.Mesh(new THREE.BoxGeometry(4.2, 3.2, 0.4), matMetal);
             sFrame.position.z = -0.2;
@@ -3256,15 +3557,15 @@
 
             // 6. Internal Target Plate & Cooling System
             const coolingGroup = new THREE.Group();
-            coolingGroup.position.z = 0.5;
+            coolingGroup.position.z = 0.8;
             // Target Plate (Gold Plated)
-            const plate = new THREE.Mesh(new THREE.BoxGeometry(4.8, 3.8, 0.1), matGold);
+            const plate = new THREE.Mesh(new THREE.BoxGeometry(5.5, 4.5, 0.1), matGold);
             coolingGroup.add(plate);
             // Heatsink Fins
-            const finGeo = new THREE.BoxGeometry(4.0, 0.05, 0.8);
-            for (let i = 0; i < 15; i++) {
+            const finGeo = new THREE.BoxGeometry(4.5, 0.05, 0.8);
+            for (let i = 0; i < 18; i++) {
                 const fin = new THREE.Mesh(finGeo, matMetal);
-                fin.position.set(0, -1.5 + i * 0.2, -0.45);
+                fin.position.set(0, -2.0 + i * 0.22, -0.45);
                 coolingGroup.add(fin);
             }
             // Fan Detail
@@ -3277,7 +3578,7 @@
             // 7. Processing Engine & PCB
             const pcbGroup = new THREE.Group();
             pcbGroup.position.z = -0.5;
-            const pcb = new THREE.Mesh(new THREE.BoxGeometry(5.8, 4.2, 0.1), matPCB);
+            const pcb = new THREE.Mesh(new THREE.BoxGeometry(7.0, 5.5, 0.1), matPCB);
             pcbGroup.add(pcb);
             // Specialized ASIC/FPGA Chips
             const asic = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 0.3), matDark);
@@ -3290,7 +3591,7 @@
 
             // 8. Media Slots
             const mediaSlots = new THREE.Group();
-            mediaSlots.position.set(2.8, 0, -1.0);
+            mediaSlots.position.set(3.5, 0, -1.0);
             const cfastSlot = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.1, 1.2), matDark);
             cfastSlot.position.y = 0.5;
             mediaSlots.add(cfastSlot);
@@ -3301,58 +3602,227 @@
 
             // 9. Battery Plate & Power Distribution
             const batteryPlate = new THREE.Group();
-            batteryPlate.position.set(0, 0, -2.4);
-            const vMount = new THREE.Mesh(new THREE.BoxGeometry(3.5, 4.5, 0.4), matDark);
+            batteryPlate.position.set(0, -3.5, 0); // Bottom of camera
+            const vMount = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.4, 3.5), matDark);
             batteryPlate.add(vMount);
             // Gold Power Pins
             for (let i = 0; i < 5; i++) {
                 const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.2), matGold);
-                pin.position.set(-0.8 + i * 0.4, 1.5, 0.2);
+                pin.rotation.x = Math.PI / 2;
+                pin.position.set(-0.8 + i * 0.4, -0.2, 0);
                 batteryPlate.add(pin);
             }
             bodyGroup.add(batteryPlate);
 
-            // 10. External Details (Handle/Buttons/EVF)
-            const handleGroup = new THREE.Group();
-            handleGroup.position.set(0, 2.75, 0);
-            const handleBase = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 3.0), matDark);
-            handleGroup.add(handleBase);
+            // ═══════════════════════════════════════════════════════════
+            // PROBLEM 2: DSLR-STYLE BACK PANEL (Nikon D810 Reference)
+            // Accurate recreation with proper proportions
+            // ═══════════════════════════════════════════════════════════
+            const backPanel = new THREE.Group();
+            backPanel.position.set(0, 0, -2.55);
+
+            // Main rear surface (slight bump from body)
+            const backPlate = new THREE.Mesh(new THREE.BoxGeometry(7.8, 6.3, 0.15), matDark);
+            backPlate.position.z = 0;
+            backPanel.add(backPlate);
+
+            // Large LCD Screen (center-left, like Nikon D810)
+            const backLcdFrame = new THREE.Mesh(new THREE.BoxGeometry(5.0, 3.8, 0.2), matDark);
+            backLcdFrame.position.set(-0.5, -0.5, -0.05);
+            backPanel.add(backLcdFrame);
+            const backLcdScreen = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 3.3),
+                new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0x0a0a0a, roughness: 0.1 })
+            );
+            backLcdScreen.position.set(-0.5, -0.5, -0.16);
+            backPanel.add(backLcdScreen);
+            // LCD screen border highlight
+            const lcdBorder = new THREE.Mesh(
+                new THREE.BoxGeometry(4.6, 3.4, 0.01),
+                new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.6 })
+            );
+            lcdBorder.position.set(-0.5, -0.5, -0.155);
+            backPanel.add(lcdBorder);
+
+            // EVF Viewfinder bump (top center, protruding)
+            const evfBump = new THREE.Group();
+            evfBump.position.set(-0.5, 3.0, -0.3);
+            const evfHousing = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.8, 1.5), matDark);
+            evfBump.add(evfHousing);
+            // EVF eyepiece (round rubber cup)
+            const evfEyecup = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.8, 0.4, 32), matDark);
+            evfEyecup.rotation.x = Math.PI / 2;
+            evfEyecup.position.z = -0.9;
+            evfBump.add(evfEyecup);
+            // EVF glass (the viewfinder optic)
+            const evfGlass = new THREE.Mesh(
+                new THREE.CircleGeometry(0.5, 32),
+                new THREE.MeshPhysicalMaterial({ color: 0x2233aa, transmission: 0.5, transparent: true, opacity: 0.5, roughness: 0.0 })
+            );
+            evfGlass.position.z = -1.11;
+            evfBump.add(evfGlass);
+            backPanel.add(evfBump);
+
+            // Right side grip area (textured rubber)
+            const gripArea = new THREE.Mesh(
+                new THREE.BoxGeometry(1.8, 5.5, 0.8),
+                new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 1.0, metalness: 0 })
+            );
+            gripArea.position.set(3.3, -0.2, -0.3);
+            backPanel.add(gripArea);
+
+            // D-Pad / Multi-selector (right side, centered vertically)
+            const dpadBase = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.18, 32), matDark);
+            dpadBase.rotation.x = Math.PI / 2;
+            dpadBase.position.set(3.0, -0.8, -0.2);
+            backPanel.add(dpadBase);
+            // D-pad center OK button
+            const dpadCenter = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.22, 32),
+                new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.4, metalness: 0.5 })
+            );
+            dpadCenter.rotation.x = Math.PI / 2;
+            dpadCenter.position.set(3.0, -0.8, -0.22);
+            backPanel.add(dpadCenter);
+            // D-pad directional bumps
+            const dpadDirs = [[0, 0.55], [0, -0.55], [0.55, 0], [-0.55, 0]];
+            dpadDirs.forEach(([dx, dy]) => {
+                const bump = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.06),
+                    new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.5 })
+                );
+                bump.position.set(3.0 + dx, -0.8 + dy, -0.24);
+                backPanel.add(bump);
+            });
+
+            // AE-L / AF-L button (above d-pad)
+            const aelBtn = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.1),
+                new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.7 })
+            );
+            aelBtn.position.set(2.5, 0.6, -0.2);
+            backPanel.add(aelBtn);
+
+            // AF-ON button (next to AE-L)
+            const afonBtn = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.1),
+                new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.7 })
+            );
+            afonBtn.position.set(3.5, 0.6, -0.2);
+            backPanel.add(afonBtn);
+
+            // Command dial (thumb wheel, top right)
+            const thumbWheel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 24), matDark);
+            thumbWheel.rotation.z = Math.PI / 2;
+            thumbWheel.position.set(3.3, 1.5, -0.2);
+            backPanel.add(thumbWheel);
+
+            // Left side button column (MENU, ?, lock, zoom+, zoom-, OK)
+            const matBtnDark = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.8, name: 'matDark' });
+            const leftBtns = [
+                { y: 2.0, size: [0.5, 0.3, 0.1] },  // MENU
+                { y: 1.4, size: [0.5, 0.3, 0.1] },  // ?
+                { y: 0.8, size: [0.5, 0.3, 0.1] },  // lock
+                { y: 0.2, size: [0.5, 0.3, 0.1] },  // zoom+
+                { y: -0.4, size: [0.5, 0.3, 0.1] }, // zoom-
+                { y: -1.0, size: [0.5, 0.3, 0.1] }  // OK
+            ];
+            leftBtns.forEach(b => {
+                const btn = new THREE.Mesh(new THREE.BoxGeometry(...b.size), matBtnDark);
+                btn.position.set(-3.2, b.y, -0.18);
+                backPanel.add(btn);
+            });
+
+            // Playback button (top left of LCD)
+            const playBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.1, 16), matBtnDark);
+            playBtn.rotation.x = Math.PI / 2;
+            playBtn.position.set(-2.2, 1.8, -0.2);
+            backPanel.add(playBtn);
+
+            // Delete/Trash button
+            const delBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 16), matBtnDark);
+            delBtn.rotation.x = Math.PI / 2;
+            delBtn.position.set(-1.2, 1.8, -0.2);
+            backPanel.add(delBtn);
+
+            // Live View button (LV - near d-pad, with red dot)
+            const lvBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.1, 16),
+                new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.6 })
+            );
+            lvBtn.rotation.x = Math.PI / 2;
+            lvBtn.position.set(3.0, -2.0, -0.2);
+            backPanel.add(lvBtn);
+            // Red dot on LV button
+            const lvDot = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.02, 16), matRed);
+            lvDot.rotation.x = Math.PI / 2;
+            lvDot.position.set(3.0, -2.0, -0.26);
+            backPanel.add(lvDot);
+
+            // Info button
+            const infoBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 16),
+                new THREE.MeshStandardMaterial({ color: 0x006600, emissive: 0x003300, roughness: 0.5 })
+            );
+            infoBtn.rotation.x = Math.PI / 2;
+            infoBtn.position.set(3.0, -2.6, -0.2);
+            backPanel.add(infoBtn);
+
+            // i button
+            const iBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.1, 16),
+                new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.6 })
+            );
+            iBtn.rotation.x = Math.PI / 2;
+            iBtn.position.set(2.2, -2.0, -0.2);
+            backPanel.add(iBtn);
+
+            // Mode dial (top left corner)
+            const modeDial = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.5, 32), matMetal);
+            modeDial.position.set(-3.0, 3.2, -0.1);
+            backPanel.add(modeDial);
+            const dialNotch = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.15), matRed);
+            dialNotch.position.set(-3.0, 3.2, -0.35);
+            backPanel.add(dialNotch);
+
+            bodyGroup.add(backPanel);
+
+            // 10. Top panel (pentaprism bump + handle + dials)
+            const topGroup = new THREE.Group();
+            topGroup.position.set(0, 3.5, 0);
+            // Pentaprism / top plate
+            const topPlate = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.5, 4.5), matDark);
+            topGroup.add(topPlate);
+            // Hot shoe mount
+            const hotShoe = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 0.6), matMetal);
+            hotShoe.position.set(0, 0.4, -0.5);
+            topGroup.add(hotShoe);
+            // Front command dial (left shoulder)
             const dial1 = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.4, 32), matDark);
-            dial1.position.set(2.0, -0.05, 1.0); // Mode Dial
-            handleGroup.add(dial1);
-            const btnRed = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 16), matRed);
-            btnRed.position.set(2.5, -0.05, -1.0); // Shutter Button
-            handleGroup.add(btnRed);
-            bodyGroup.add(handleGroup);
+            dial1.position.set(-3.0, 0.1, 1.5);
+            topGroup.add(dial1);
+            // Shutter button (right shoulder)
+            const btnRedTop = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.2, 16), matRed);
+            btnRedTop.position.set(3.0, 0.2, 1.5);
+            topGroup.add(btnRedTop);
+            // Top LCD info display
+            const topLcd = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 0.8),
+                new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0x111111 })
+            );
+            topLcd.rotation.x = -Math.PI / 2;
+            topLcd.position.set(1.0, 0.26, 0);
+            topGroup.add(topLcd);
+            bodyGroup.add(topGroup);
 
-            // 10.5 Viewfinder (EVF)
-            const evfGroup = new THREE.Group();
-            evfGroup.position.set(-2.0, 3.2, -1.0);
-            const evfBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.0, 1.8), matDark);
-            evfGroup.add(evfBody);
-            const eyepiece = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 32), matDark);
-            eyepiece.rotation.x = Math.PI / 2;
-            eyepiece.position.z = -1.0;
-            evfGroup.add(eyepiece);
-            bodyGroup.add(evfGroup);
-
-            // 11. Front Details (Tally & Release)
+            // 11. Front Details (Tally & Lens Release)
             const frontDetails = new THREE.Group();
-            frontDetails.position.z = 2.0;
-            const tally = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), matTally);
-            tally.position.set(1.5, 2.0, 0.1);
-            frontDetails.add(tally);
+            frontDetails.position.z = 2.5;
+            const tallyLight = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), matTally);
+            tallyLight.position.set(1.5, 2.0, 0.1);
+            frontDetails.add(tallyLight);
             const releaseBtn = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.2, 16), matMetal);
             releaseBtn.rotation.x = Math.PI / 2;
-            releaseBtn.position.set(2.5, -1.5, 0.1);
+            releaseBtn.position.set(3.5, -1.5, 0.1);
             frontDetails.add(releaseBtn);
             bodyGroup.add(frontDetails);
 
-            // 12. Mount Adapter
+            // 12. Mount Adapter (larger to match bigger body)
             const adapterGeo = new THREE.CylinderGeometry(3.2, 3.2, 0.9, 64);
             const adapter = new THREE.Mesh(adapterGeo, matMetal);
             adapter.rotation.x = Math.PI / 2;
-            adapter.position.z = 2.45;
+            adapter.position.z = 2.95;
             bodyGroup.add(adapter);
 
             anatomyModel.add(bodyGroup);
@@ -3360,7 +3830,7 @@
             // --- LENS SYSTEM ---
             const lensGroup = new THREE.Group();
             lensGroup.userData.type = 'lens';
-            lensGroup.position.z = 2.8; // Start after adapter
+            lensGroup.position.z = 3.4; // Start after adapter on larger body
 
             // 1. Outer Barrel
             const barrelGeo = new THREE.CylinderGeometry(3.0, 3.0, 8.0, 64, 1, true);
@@ -3416,24 +3886,254 @@
                 lensGroup.add(grp);
             });
 
+            // ═══════════════════════════════════════════════════════════
+            // IRIS DIAPHRAGM - Properly visible INSIDE the barrel
+            // Small blades that form a clear aperture opening
+            // ═══════════════════════════════════════════════════════════
+            const irisGroup = new THREE.Group();
+            irisGroup.position.z = 4.0; // Center of lens barrel
+            anatomyIrisBlades = [];
+
+            const numBlades = 9;
+            const irisOuterR = 2.8; // Just inside barrel wall (barrel = 3.0)
+            const matBlade = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.2,
+                metalness: 0.95,
+                side: THREE.DoubleSide,
+                name: 'matBlade'
+            });
+
+            for (let i = 0; i < numBlades; i++) {
+                const angle = (i / numBlades) * Math.PI * 2;
+
+                // Each blade is a flat overlapping petal
+                // Pivot at the outer edge, blade extends inward
+                const pivotX = Math.cos(angle) * irisOuterR;
+                const pivotY = Math.sin(angle) * irisOuterR;
+
+                // Blade shape: tapered rectangle that covers from edge to center
+                const shape = new THREE.Shape();
+                const bW = 1.2;  // blade width at base
+                const bH = irisOuterR; // blade length (reaches to center)
+                const tipW = 0.3; // narrow tip
+                shape.moveTo(-bW / 2, 0);
+                shape.lineTo(-tipW / 2, bH);
+                shape.lineTo(tipW / 2, bH);
+                shape.lineTo(bW / 2, 0);
+                shape.lineTo(-bW / 2, 0);
+
+                const bladeGeo = new THREE.ShapeGeometry(shape);
+                const blade = new THREE.Mesh(bladeGeo, matBlade.clone());
+
+                // Position at the iris ring edge, pointing inward
+                blade.position.set(pivotX, pivotY, 0);
+                blade.rotation.z = angle + Math.PI / 2; // Point toward center
+                blade.userData = {
+                    baseAngle: angle,
+                    pivotX: pivotX,
+                    pivotY: pivotY,
+                    index: i
+                };
+
+                irisGroup.add(blade);
+                anatomyIrisBlades.push(blade);
+            }
+
+            // Iris housing ring - clearly visible metal ring
+            const irisHousing = new THREE.Mesh(
+                new THREE.TorusGeometry(irisOuterR, 0.12, 16, 64),
+                matMetal
+            );
+            irisGroup.add(irisHousing);
+
+            // Inner iris ring guide (smaller)
+            const irisInnerRing = new THREE.Mesh(
+                new THREE.TorusGeometry(irisOuterR * 0.4, 0.05, 8, 32),
+                matMetal
+            );
+            irisGroup.add(irisInnerRing);
+
+            lensGroup.add(irisGroup);
+
             anatomyModel.add(lensGroup);
 
-            // --- LIGHT RAYS ---
+            // ═══════════════════════════════════════════════════════════
+            // PROBLEM 3: APERTURE-RESPONSIVE LIGHT RAYS
+            // Light rays change spread and intensity based on f-stop
+            // ═══════════════════════════════════════════════════════════
             anatomyLightRays = new THREE.Group();
-            const rayMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.6 });
-            for (let i = 0; i < 24; i++) {
-                const a = (i / 24) * Math.PI * 2;
-                const pts = [
-                    new THREE.Vector3(Math.cos(a) * 2.5, Math.sin(a) * 2.5, 18),
-                    new THREE.Vector3(Math.cos(a) * 1.8, Math.sin(a) * 1.8, 6),
-                    new THREE.Vector3(0, 0, 1.0)
-                ];
-                anatomyLightRays.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), rayMat));
-            }
+            createApertureResponsiveLightRays(anatomyState.apertureValue);
             anatomyLightRays.visible = false;
             anatomyModel.add(anatomyLightRays);
 
             anatomyScene.add(anatomyModel);
+
+            // Apply initial iris position
+            updateIrisAperture(anatomyState.apertureValue);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PROBLEM 3: Create light rays that respond to aperture
+        // ═══════════════════════════════════════════════════════════════
+        function createApertureResponsiveLightRays(fStop) {
+            // Clear existing rays
+            while (anatomyLightRays.children.length > 0) {
+                const child = anatomyLightRays.children[0];
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+                anatomyLightRays.remove(child);
+            }
+
+            // Calculate aperture parameters
+            const maxFStop = 22;
+            const minFStop = 1.4;
+            const normalizedAperture = 1 - ((fStop - minFStop) / (maxFStop - minFStop));
+            const numRays = Math.floor(6 + normalizedAperture * 18); // 6 to 24 rays
+            const rayOpacity = 0.2 + normalizedAperture * 0.5;
+
+            // Aperture opening radius (how much light passes through)
+            const maxOpenR = 2.5;  // Wide open at f/1.4
+            const minOpenR = 0.2;  // Nearly closed at f/22
+            const apertureOpenR = minOpenR + normalizedAperture * (maxOpenR - minOpenR);
+
+            // Warm golden for wide, cool dim for narrow
+            const r = 1.0;
+            const g = 0.85 + normalizedAperture * 0.15;
+            const b = 0.3 + (1 - normalizedAperture) * 0.4;
+            const rayColor = new THREE.Color(r, g, b);
+
+            // Lens system Z positions (relative to lens group)
+            const frontLensZ = 8.0;   // Front element
+            const irisZ = 4.0;        // Iris position
+            const rearLensZ = 0.5;    // Rear element
+            const sensorZ = -4.0;     // Sensor position (inside body)
+
+            // CORRECTED Z-COORDINATES based on anatomy geometry
+            // body at 0, lensGroup at 3.4, irisGroup at 4.0(rel), optics[5] at 7.8(rel)
+            const frontLensWorldZ = 11.2;
+            const irisWorldZ = 7.4;
+            const sensorWorldZ = 1.5;
+            const envWorldZ = frontLensWorldZ + 20.0; // Light origin far in front
+
+            for (let i = 0; i < numRays; i++) {
+                const angle = (i / numRays) * Math.PI * 2;
+
+                // 1. Environmental Origin (Wide and volumetric)
+                const entryR = 3.0 + normalizedAperture * 2.0;
+                const envX = Math.cos(angle) * entryR * 3.0; // Very wide origin
+                const envY = Math.sin(angle) * entryR * 3.0;
+
+                // 2. Entrance Pupil (Outer lens rim)
+                const rimX = Math.cos(angle) * 2.9;
+                const rimY = Math.sin(angle) * 2.9;
+
+                // 3. Iris opening (Aperture-dependent)
+                const irisX = Math.cos(angle) * apertureOpenR;
+                const irisY = Math.sin(angle) * apertureOpenR;
+
+                // 4. Convergence (Sensor target)
+                const sensorX = Math.cos(angle) * 0.02;
+                const sensorY = Math.sin(angle) * 0.02;
+
+                // Path: Environment -> Lens Rim -> Iris -> Sensor
+                const pts = [
+                    new THREE.Vector3(envX, envY, envWorldZ),
+                    new THREE.Vector3(rimX, rimY, frontLensWorldZ),
+                    new THREE.Vector3(irisX, irisY, irisWorldZ),
+                    new THREE.Vector3(irisX * 0.5, irisY * 0.5, irisWorldZ - 2.0), // Post-iris refraction
+                    new THREE.Vector3(sensorX, sensorY, sensorWorldZ)
+                ];
+
+                const curve = new THREE.CatmullRomCurve3(pts);
+                const curvePoints = curve.getPoints(50);
+                const geo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+
+                const mat = new THREE.LineBasicMaterial({
+                    color: rayColor,
+                    transparent: true,
+                    opacity: rayOpacity * 1.8,
+                    linewidth: 2,
+                    blending: THREE.AdditiveBlending
+                });
+
+                const line = new THREE.Line(geo, mat);
+                anatomyLightRays.add(line);
+            }
+
+            // Central "Focus Beam" (Laser-like core)
+            const beamPts = [
+                new THREE.Vector3(0, 0, envWorldZ + 10),
+                new THREE.Vector3(0, 0, sensorWorldZ)
+            ];
+            const beamGeo = new THREE.BufferGeometry().setFromPoints(beamPts);
+            const beamMat = new THREE.LineBasicMaterial({
+                color: new THREE.Color(1.0, 1.0, 0.9),
+                transparent: true,
+                opacity: rayOpacity * 0.6,
+                blending: THREE.AdditiveBlending
+            });
+            anatomyLightRays.add(new THREE.Line(beamGeo, beamMat));
+
+            // Add volumetric "Photons" (Particles moving towards sensor)
+            const particleGeo = new THREE.BufferGeometry();
+            const pCount = 40;
+            const pPositions = new Float32Array(pCount * 3);
+            for (let i = 0; i < pCount; i++) {
+                pPositions[i * 3] = (Math.random() - 0.5) * 8;
+                pPositions[i * 3 + 1] = (Math.random() - 0.5) * 8;
+                pPositions[i * 3 + 2] = envWorldZ + Math.random() * 20;
+            }
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+            const particleMat = new THREE.PointsMaterial({
+                color: 0xffffee,
+                size: 0.15,
+                transparent: true,
+                opacity: 0.6,
+                blending: THREE.AdditiveBlending
+            });
+            const photons = new THREE.Points(particleGeo, particleMat);
+            photons.userData = { isPhotons: true };
+            anatomyLightRays.add(photons);
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // PROBLEM 1: Update iris blade positions based on f-stop
+        // Blades ROTATE on their pivot points to open/close the iris
+        // All geometry stays INSIDE the barrel at all times
+        // ═══════════════════════════════════════════════════════════════
+        function updateIrisAperture(fStop) {
+            if (!anatomyIrisBlades.length) return;
+
+            // Normalize: f/1.4 = fully open (blades rotated out), f/22 = closed (cover center)
+            const maxFStop = 22;
+            const minFStop = 1.4;
+            const closeFactor = (fStop - minFStop) / (maxFStop - minFStop); // 0 = open, 1 = closed
+
+            const numBlades = anatomyIrisBlades.length;
+            for (let i = 0; i < numBlades; i++) {
+                const blade = anatomyIrisBlades[i];
+                const angle = blade.userData.baseAngle;
+
+                // APERTURE FIX: Increase swing to 1.8 radians to fully clear the 
+                // optical path and retract behind the 3.0 radius barrel when at f/1.4.
+                const maxSwing = 1.8;
+                const rotationOffset = maxSwing * (1 - closeFactor);
+
+                blade.rotation.z = angle + Math.PI / 2 + rotationOffset;
+
+                // Scale adjustment to ensure the blades completely clear the optical path when open
+                // and fully overlap when closed without peeking out of the 3.0 barrel.
+                const s = 0.7 + closeFactor * 0.35; // Smaller when open
+                blade.scale.set(s, s, 1);
+            }
+
+            // Update light rays to match aperture
+            if (anatomyLightRays) {
+                const wasVisible = anatomyLightRays.visible;
+                createApertureResponsiveLightRays(fStop);
+                anatomyLightRays.visible = wasVisible;
+            }
         }
 
         function setupAnatomyControls() {
@@ -3446,8 +4146,24 @@
             // Toggle Rotation
             document.getElementById('btn-anatomy-rotate').onclick = () => {
                 anatomyState.isRotating = !anatomyState.isRotating;
-                document.getElementById('btn-anatomy-rotate').classList.toggle('text-indigo-400');
+                const btn = document.getElementById('btn-anatomy-rotate');
+                btn.classList.toggle('text-indigo-400');
+                btn.classList.toggle('scale-110');
             };
+
+            // Enhanced Double Click to toggle rotation on the whole container
+            const canvasContainer = document.getElementById('anatomy-canvas-container');
+            if (canvasContainer) {
+                canvasContainer.addEventListener('dblclick', (e) => {
+                    e.preventDefault();
+                    anatomyState.isRotating = !anatomyState.isRotating;
+                    const rotateBtn = document.getElementById('btn-anatomy-rotate');
+                    if (rotateBtn) {
+                        rotateBtn.classList.toggle('text-indigo-400');
+                        rotateBtn.classList.toggle('scale-110');
+                    }
+                });
+            }
 
             // Focus Slider
             document.getElementById('anatomy-focus-slider').oninput = (e) => {
@@ -3455,6 +4171,43 @@
                 document.getElementById('anatomy-focus-val').innerText = anatomyState.focusDistance.toFixed(1) + 'm';
                 updateInternalFocus();
             };
+
+            // ═══════════════════════════════════════════════════════════
+            // PROBLEM 1 & 3: Aperture Slider in Anatomy Mode
+            // ═══════════════════════════════════════════════════════════
+            const apertureSlider = document.getElementById('anatomy-aperture-slider');
+            const apertureVal = document.getElementById('anatomy-aperture-val');
+
+            if (apertureSlider) {
+                apertureSlider.oninput = (e) => {
+                    const fStop = parseFloat(e.target.value);
+                    anatomyState.apertureValue = fStop;
+                    apertureVal.innerText = `f/${fStop.toFixed(1)}`;
+                    updateIrisAperture(fStop);
+                };
+            }
+
+            // Preset buttons
+            const btnShallow = document.getElementById('btn-anatomy-shallow');
+            const btnDeep = document.getElementById('btn-anatomy-deep');
+
+            if (btnShallow) {
+                btnShallow.onclick = () => {
+                    anatomyState.apertureValue = 1.8;
+                    if (apertureSlider) apertureSlider.value = 1.8;
+                    if (apertureVal) apertureVal.innerText = 'f/1.8';
+                    updateIrisAperture(1.8);
+                };
+            }
+
+            if (btnDeep) {
+                btnDeep.onclick = () => {
+                    anatomyState.apertureValue = 16;
+                    if (apertureSlider) apertureSlider.value = 16;
+                    if (apertureVal) apertureVal.innerText = 'f/16.0';
+                    updateIrisAperture(16);
+                };
+            }
 
             // View Mode Buttons
             const viewButtons = {
@@ -3515,6 +4268,7 @@
 
         function updateAnatomyMaterials() {
             const isXray = anatomyState.viewMode === 'xray';
+            const isExploded = anatomyState.viewMode === 'exploded';
 
             anatomyModel.traverse(child => {
                 if (child.isMesh) {
@@ -3539,6 +4293,14 @@
                             mat.transparent = true;
                             mat.opacity = 0.5; // High visibility for target plate
                             mat.color.setHex(0xaaaaaa);
+                        }
+                        // IRIS BLADES -> Fully visible in xray (key visual)
+                        else if (mat.name === 'matBlade') {
+                            mat.wireframe = false;
+                            mat.transparent = false;
+                            mat.opacity = 1.0;
+                            mat.color.setHex(0x2a2a2a);
+                            mat.emissiveIntensity = 0.2;
                         }
                         // FILTERS -> Tinted Transparent
                         else if (mat.name === 'matIR' || mat.name === 'matOLPF') {
@@ -3588,12 +4350,18 @@
                         if (mat.name === 'matGold') {
                             mat.color.setHex(0xffd700);
                         }
+                        // Iris blades in standard mode
+                        if (mat.name === 'matBlade') {
+                            mat.color.setHex(0x1a1a1a);
+                            mat.opacity = 1.0;
+                            mat.emissiveIntensity = 0;
+                        }
                     }
                 }
             });
 
-            // Toggle light rays
-            anatomyLightRays.visible = isXray;
+            // Toggle light rays - visible in xray AND exploded modes
+            anatomyLightRays.visible = isXray || isExploded;
         }
 
         function animateAnatomy() {
@@ -3610,9 +4378,29 @@
 
             anatomyModel.children.forEach(group => {
                 if (group.userData.type === 'lens') {
-                    group.position.z = 1.5 + anatomyState.explodeFactor * 5;
+                    group.position.z = 3.4 + anatomyState.explodeFactor * 5;
                 }
             });
+
+            // Animate Photons (Moving light particles)
+            if (anatomyLightRays.visible) {
+                anatomyLightRays.traverse(child => {
+                    if (child.userData && child.userData.isPhotons) {
+                        const pos = child.geometry.attributes.position;
+                        for (let i = 0; i < pos.count; i++) {
+                            let z = pos.getZ(i);
+                            z -= 0.5; // Move towards sensor
+                            if (z < 1.5) z = 35; // Reset to environment
+                            pos.setZ(i, z);
+
+                            // Jitter X/Y for shimmer
+                            pos.setX(i, pos.getX(i) + (Math.random() - 0.5) * 0.05);
+                            pos.setY(i, pos.getY(i) + (Math.random() - 0.5) * 0.05);
+                        }
+                        pos.needsUpdate = true;
+                    }
+                });
+            }
 
             anatomyControls.update();
             anatomyRenderer.render(anatomyScene, anatomyCamera);
@@ -3702,6 +4490,34 @@
                         </div>
                         <p class="text-[10px] text-slate-500 leading-relaxed italic">Observe how the internal lens
                             groups move to converge light on the CMOS sensor.</p>
+                    </div>
+                </div>
+
+                <!-- Aperture / Iris Control (Problem 1 & 3) -->
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center border-b border-amber-500/30 pb-2">
+                        <h3 class="text-amber-400 text-[10px] font-black uppercase tracking-widest">Iris / Aperture</h3>
+                        <span id="anatomy-aperture-val" class="text-white text-[10px] font-mono">f/4.0</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="relative pt-1">
+                            <input type="range" id="anatomy-aperture-slider" min="1.4" max="22" step="0.1" value="4.0"
+                                class="w-full accent-amber-500 bg-slate-800 h-1.5 rounded-full appearance-none cursor-pointer">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="btn-anatomy-shallow"
+                                class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 text-[9px] font-black py-2 rounded border border-amber-500/30 transition-all uppercase">
+                                f/1.8 Wide
+                            </button>
+                            <button id="btn-anatomy-deep"
+                                class="bg-slate-500/20 hover:bg-slate-500/30 text-slate-300 text-[9px] font-black py-2 rounded border border-slate-500/30 transition-all uppercase">
+                                f/16 Narrow
+                            </button>
+                        </div>
+                        <p class="text-[10px] text-slate-500 leading-relaxed italic">
+                            Watch the iris blades open/close and light rays change. Low f-stop = wide open (cinematic
+                            bokeh). High f-stop = narrow (documentary sharp).
+                        </p>
                     </div>
                 </div>
 
